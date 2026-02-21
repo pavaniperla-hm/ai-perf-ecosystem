@@ -44,9 +44,13 @@ def health():
 def list_orders(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    user_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
-    return db.query(Order).offset(skip).limit(limit).all()
+    q = db.query(Order)
+    if user_id is not None:
+        q = q.filter(Order.user_id == user_id)
+    return q.offset(skip).limit(limit).all()
 
 
 @app.get("/orders/{order_id}", response_model=OrderOut)

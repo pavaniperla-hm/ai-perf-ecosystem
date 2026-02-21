@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
 
   # ── Databases ──────────────────────────────────────────────────────────────
@@ -99,6 +97,20 @@ services:
       retries: 10
       start_period: 180s  # allows time for 50 K seed
 
+  # ── Frontend ───────────────────────────────────────────────────────────────
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - nginx
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ── API Gateway ────────────────────────────────────────────────────────────
 
   nginx:
@@ -112,7 +124,7 @@ services:
       - product-service
       - order-service
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
