@@ -14,9 +14,9 @@ export function AuthProvider({ children }) {
   })
 
   async function login(email, password) {
-    const data = await getUsers({ limit: 1000 })
+    const data = await getUsers({ limit: 1, email })
     const users = Array.isArray(data) ? data : (data.users || data.data || [])
-    const found = users.find(u => u.email?.toLowerCase() === email.toLowerCase())
+    const found = users[0]
     if (!found) throw new Error('User not found')
     const loggedIn = { ...found, password }
     setUser(loggedIn)

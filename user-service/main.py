@@ -44,9 +44,13 @@ def health():
 def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    email: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ):
-    return db.query(User).offset(skip).limit(limit).all()
+    q = db.query(User)
+    if email is not None:
+        q = q.filter(User.email == email)
+    return q.offset(skip).limit(limit).all()
 
 
 @app.get("/users/{user_id}", response_model=UserOut)
