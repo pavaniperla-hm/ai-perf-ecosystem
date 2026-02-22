@@ -8,6 +8,8 @@ services:
       POSTGRES_DB: userdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
     volumes:
       - user-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -22,6 +24,8 @@ services:
       POSTGRES_DB: productdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
     volumes:
       - product-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -36,6 +40,8 @@ services:
       POSTGRES_DB: orderdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
     volumes:
       - order-db-data:/var/lib/postgresql/data
     healthcheck:

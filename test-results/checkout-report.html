@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Checkout Load Test — Performance Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           margin: 0; background: #f1f5f9; color: #1e293b; }
+    .header { background: linear-gradient(135deg,#1e3a5f,#2563eb);
+              color:#fff; padding:32px 40px; }
+    .header h1 { margin:0 0 4px; font-size:1.8rem; }
+    .header p  { margin:0; opacity:.75; font-size:.9rem; }
+    .content   { max-width:1200px; margin:32px auto; padding:0 24px; }
+    .card      { background:#fff; border-radius:12px;
+                 box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:28px; overflow:hidden; }
+    .card-title { padding:16px 20px; font-size:1rem; font-weight:700; color:#0f172a;
+                  border-bottom:1px solid #e2e8f0; background:#fff; }
+    .kpi-grid  { display:grid; grid-template-columns:repeat(4,1fr); gap:0; }
+    .kpi       { padding:20px 24px; border-right:1px solid #e2e8f0; }
+    .kpi:last-child { border-right:none; }
+    .kpi-label { font-size:.72rem; color:#64748b; text-transform:uppercase;
+                 letter-spacing:.06em; margin-bottom:6px; }
+    .kpi-value { font-size:1.6rem; font-weight:700; color:#0f172a; line-height:1; }
+    .kpi-sub   { font-size:.75rem; color:#94a3b8; margin-top:4px; }
+    .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-bottom:28px; }
+    .chart-wrap  { padding:20px; }
+    .chart-wrap canvas { max-height:280px; }
+    table      { width:100%; border-collapse:collapse; }
+    thead th   { background:#f8fafc; padding:10px 16px; text-align:right;
+                 font-size:.75rem; text-transform:uppercase; letter-spacing:.05em;
+                 color:#475569; font-weight:600; border-bottom:2px solid #e2e8f0; }
+    thead th:first-child { text-align:left; }
+    tbody td   { padding:11px 16px; text-align:right; border-bottom:1px solid #f1f5f9;
+                 font-size:.9rem; }
+    tbody tr:last-child td { border-bottom:none; }
+    tbody tr:hover { background:#f8fafc; }
+    .txn-name  { text-align:left; font-weight:600; color:#1e3a5f; }
+    .center    { text-align:center; }
+    .badge     { display:inline-block; padding:2px 10px; border-radius:99px;
+                 font-size:.75rem; font-weight:700; }
+    .badge.pass { background:#dcfce7; color:#16a34a; }
+    .badge.fail { background:#fee2e2; color:#dc2626; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Checkout Load Test — Performance Report</h1>
+    <p>5 Virtual Users &nbsp;·&nbsp; 5 minutes &nbsp;·&nbsp; Generated Sun, 22 Feb 2026 16:54:01 GMT</p>
+  </div>
+  <div class="content">
+
+    <!-- KPIs -->
+    <div class="card">
+      <div class="card-title">Overall Summary</div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">Total Requests</div>
+          <div class="kpi-value">1200</div>
+          <div class="kpi-sub">3.94 req/s</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Avg Response Time</div>
+          <div class="kpi-value">17 ms</div>
+          <div class="kpi-sub">p(95) = 23 ms</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Check Pass Rate</div>
+          <div class="kpi-value">100.00%</div>
+          <div class="kpi-sub">2400 passed / 0 failed</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Error Rate</div>
+          <div class="kpi-value">0.00%</div>
+          <div class="kpi-sub">Threshold &lt; 5%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="card">
+        <div class="card-title">Avg / p(90) / p(95) Response Time by Transaction</div>
+        <div class="chart-wrap"><canvas id="chartPercentiles"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Min / Max Response Time by Transaction</div>
+        <div class="chart-wrap"><canvas id="chartMinMax"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="card-title">Transaction Response Times</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">Transaction</th>
+            <th>Avg</th><th>Min</th><th>Max</th>
+            <th>Median</th><th>p(90)</th><th>p(95)</th>
+            <th style="text-align:center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+    <tr>
+      <td class="txn-name">Login Page</td>
+      <td>12 ms</td>
+      <td>1 ms</td>
+      <td>39 ms</td>
+      <td>10 ms</td>
+      <td>18 ms</td>
+      <td>22 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Products Page</td>
+      <td>7 ms</td>
+      <td>1 ms</td>
+      <td>42 ms</td>
+      <td>5 ms</td>
+      <td>10 ms</td>
+      <td>17 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Product Detail Page</td>
+      <td>6 ms</td>
+      <td>2 ms</td>
+      <td>213 ms</td>
+      <td>4 ms</td>
+      <td>7 ms</td>
+      <td>8 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Checkout Page</td>
+      <td>44 ms</td>
+      <td>6 ms</td>
+      <td>1668 ms</td>
+      <td>16 ms</td>
+      <td>25 ms</td>
+      <td>35 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    const labels  = ["Login Page","Products Page","Product Detail Page","Checkout Page"];
+    const avgData = [12,7,6,44];
+    const minData = [1,1,2,6];
+    const maxData = [39,42,213,1668];
+    const p90Data = [18,10,7,25];
+    const p95Data = [22,17,8,35];
+
+    const defaults = {
+      responsive: true,
+      plugins: { legend: { position: 'top' } },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'ms' } }
+      }
+    };
+
+    new Chart(document.getElementById('chartPercentiles'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Avg',   data: avgData, backgroundColor: 'rgba(37,99,235,.7)'  },
+          { label: 'p(90)', data: p90Data, backgroundColor: 'rgba(234,179,8,.7)'  },
+          { label: 'p(95)', data: p95Data, backgroundColor: 'rgba(220,38,38,.7)'  },
+        ]
+      },
+      options: defaults
+    });
+
+    new Chart(document.getElementById('chartMinMax'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Min', data: minData, backgroundColor: 'rgba(22,163,74,.7)'  },
+          { label: 'Max', data: maxData, backgroundColor: 'rgba(220,38,38,.7)'  },
+        ]
+      },
+      options: defaults
+    });
+  </script>
+</body>
+</html>
