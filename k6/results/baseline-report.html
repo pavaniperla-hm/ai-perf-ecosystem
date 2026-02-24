@@ -51,7 +51,7 @@
   <div class="header">
     <div class="scenario-badge">BASELINE</div>
     <h1>Baseline Load Test — Performance Report</h1>
-    <p>10 Virtual Users &nbsp;·&nbsp; 5 minutes &nbsp;·&nbsp; Threshold: p(95) &lt; 1500 ms &nbsp;·&nbsp; Generated Sun, 22 Feb 2026 19:51:03 GMT</p>
+    <p>10 Virtual Users &nbsp;·&nbsp; 5 minutes &nbsp;·&nbsp; Threshold: p(95) &lt; 1500 ms &nbsp;·&nbsp; Generated Tue, 24 Feb 2026 13:34:55 GMT</p>
   </div>
   <div class="content">
 
@@ -61,21 +61,21 @@
         <div class="kpi">
           <div class="kpi-label">Total Requests</div>
           <div class="kpi-value">2400</div>
-          <div class="kpi-sub">7.91 req/s</div>
+          <div class="kpi-sub">7.90 req/s</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Avg Response Time</div>
-          <div class="kpi-value">13 ms</div>
-          <div class="kpi-sub">p(95) = 30 ms</div>
+          <div class="kpi-value">14 ms</div>
+          <div class="kpi-sub">p(95) = 37 ms</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Check Pass Rate</div>
-          <div class="kpi-value">99.96%</div>
-          <div class="kpi-sub">4798 passed / 2 failed</div>
+          <div class="kpi-value">100.00%</div>
+          <div class="kpi-sub">4800 passed / 0 failed</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Error Rate</div>
-          <div class="kpi-value">0.04%</div>
+          <div class="kpi-value">0.00%</div>
           <div class="kpi-sub">Threshold &lt; 1%</div>
         </div>
       </div>
@@ -106,42 +106,42 @@
         <tbody>
     <tr>
       <td class="txn-name">Login Page</td>
-      <td>17 ms</td>
-      <td>1 ms</td>
-      <td>312 ms</td>
+      <td>15 ms</td>
+      <td>2 ms</td>
+      <td>134 ms</td>
       <td>11 ms</td>
-      <td>21 ms</td>
-      <td>25 ms</td>
+      <td>26 ms</td>
+      <td>33 ms</td>
       <td class="center"><span class="badge pass">PASSED</span></td>
     </tr>
     <tr>
       <td class="txn-name">Products Page</td>
       <td>7 ms</td>
       <td>1 ms</td>
-      <td>96 ms</td>
+      <td>106 ms</td>
       <td>5 ms</td>
       <td>10 ms</td>
-      <td>13 ms</td>
+      <td>15 ms</td>
       <td class="center"><span class="badge pass">PASSED</span></td>
     </tr>
     <tr>
       <td class="txn-name">Product Detail Page</td>
       <td>5 ms</td>
-      <td>1 ms</td>
-      <td>30 ms</td>
+      <td>0 ms</td>
+      <td>49 ms</td>
       <td>4 ms</td>
       <td>8 ms</td>
-      <td>9 ms</td>
+      <td>10 ms</td>
       <td class="center"><span class="badge pass">PASSED</span></td>
     </tr>
     <tr>
       <td class="txn-name">Checkout Page</td>
-      <td>24 ms</td>
+      <td>30 ms</td>
       <td>6 ms</td>
-      <td>244 ms</td>
-      <td>18 ms</td>
-      <td>36 ms</td>
-      <td>42 ms</td>
+      <td>396 ms</td>
+      <td>17 ms</td>
+      <td>43 ms</td>
+      <td>101 ms</td>
       <td class="center"><span class="badge pass">PASSED</span></td>
     </tr></tbody>
       </table>
@@ -151,11 +151,11 @@
 
   <script>
     const labels  = ["Login Page","Products Page","Product Detail Page","Checkout Page"];
-    const avgData = [17,7,5,24];
-    const minData = [1,1,1,6];
-    const maxData = [312,96,30,244];
-    const p90Data = [21,10,8,36];
-    const p95Data = [25,13,9,42];
+    const avgData = [15,7,5,30];
+    const minData = [2,1,0,6];
+    const maxData = [134,106,49,396];
+    const p90Data = [26,10,8,43];
+    const p95Data = [33,15,10,101];
 
     const defaults = {
       responsive: true,

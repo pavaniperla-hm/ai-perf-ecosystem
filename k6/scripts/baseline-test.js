@@ -2,8 +2,8 @@ import http from 'k6/http';
 import { check, group, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Rate, Trend } from 'k6/metrics';
-import { htmlReport } from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from '../config/grafana-config.js';
 
 // ── Custom metrics ────────────────────────────────────────────────────────────
 const errorRate    = new Rate('errors');
@@ -14,7 +14,7 @@ const orderTrend   = new Trend('txn_checkout_page',       true);
 
 // ── Test data ─────────────────────────────────────────────────────────────────
 const customers = new SharedArray('customers', () =>
-  open('../../test-data/test-data-checkout.csv')
+  open('../data/test-data-checkout.csv')
     .split('\n').slice(1).filter(Boolean)
     .map(line => {
       const [
@@ -35,20 +35,27 @@ const customers = new SharedArray('customers', () =>
 );
 
 // ── Options ───────────────────────────────────────────────────────────────────
+// Baseline: steady 10 VUs for 5 minutes — establishes normal performance baseline.
+// Thresholds are strict because load is minimal; any slowness here is real overhead.
 export const options = {
-  vus:      5,
+  vus:      10,
   duration: '5m',
 
   thresholds: {
-    // Overall
-    http_req_duration: ['p(95)<2000'],
-    errors:            ['rate<0.05'],
+    http_req_duration:       ['p(95)<1500'],   // tighter than peak/stress
+    errors:                  ['rate<0.01'],    // near-zero errors expected at baseline
 
-    // Per-transaction thresholds
-    txn_login_page:          ['p(95)<2000'],
-    txn_products_page:       ['p(95)<2000'],
-    txn_product_detail_page: ['p(95)<2000'],
-    txn_checkout_page:       ['p(95)<2000'],
+    txn_login_page:          ['p(95)<1500'],
+    txn_products_page:       ['p(95)<1500'],
+    txn_product_detail_page: ['p(95)<1500'],
+    txn_checkout_page:       ['p(95)<1500'],
+  },
+
+  // Tags are attached to every metric sent to Grafana — use them to filter
+  // dashboards by test name or type across multiple runs.
+  tags: {
+    testName: 'baseline-load',
+    testType: 'baseline',
   },
 };
 
@@ -58,7 +65,6 @@ const BASE = 'http://localhost';
 export default function () {
   const customer = customers[__VU % customers.length];
 
-  // ── Step 1: Login Page ────────────────────────────────────────────────────
   group('Login Page', () => {
     const start = Date.now();
     const res = http.get(
@@ -74,13 +80,11 @@ export default function () {
       },
     });
     errorRate.add(!ok);
-
     if (!ok) { sleep(1); return; }
   });
 
   sleep(1);
 
-  // ── Step 2: Products Page ─────────────────────────────────────────────────
   group('Products Page', () => {
     const start = Date.now();
     const res = http.get(
@@ -100,7 +104,6 @@ export default function () {
 
   sleep(2);
 
-  // ── Step 3: Product Detail Page ───────────────────────────────────────────
   group('Product Detail Page', () => {
     const start = Date.now();
     const res = http.get(
@@ -120,7 +123,6 @@ export default function () {
 
   sleep(1);
 
-  // ── Step 4: Checkout Page ─────────────────────────────────────────────────
   group('Checkout Page', () => {
     const payload = JSON.stringify({
       user_id:     customer.customer_id,
@@ -143,7 +145,7 @@ export default function () {
     orderTrend.add(Date.now() - start);
 
     const ok = check(res, {
-      'Checkout Page | Status 201':   r => r.status === 201,
+      'Checkout Page | Status 201':    r => r.status === 201,
       'Checkout Page | Order created': r => {
         try { return JSON.parse(r.body).id !== undefined; } catch { return false; }
       },
@@ -171,7 +173,7 @@ function buildReport(data) {
     return { label, v: m ? m.values : {} };
   });
 
-  const statusBadge = (p95, threshold = 2000) =>
+  const statusBadge = (p95, threshold = 1500) =>
     p95 < threshold
       ? `<span class="badge pass">PASSED</span>`
       : `<span class="badge fail">FAILED</span>`;
@@ -188,10 +190,10 @@ function buildReport(data) {
       <td class="center">${statusBadge(v['p(95)'])}</td>
     </tr>`).join('');
 
-  const checks   = data.metrics.checks           ? data.metrics.checks.values           : {};
-  const errMetric= data.metrics.errors            ? data.metrics.errors.values            : {};
-  const dur      = data.metrics.http_req_duration ? data.metrics.http_req_duration.values : {};
-  const reqs     = data.metrics.http_reqs         ? data.metrics.http_reqs.values         : {};
+  const checks    = data.metrics.checks           ? data.metrics.checks.values           : {};
+  const errMetric = data.metrics.errors            ? data.metrics.errors.values            : {};
+  const dur       = data.metrics.http_req_duration ? data.metrics.http_req_duration.values : {};
+  const reqs      = data.metrics.http_reqs         ? data.metrics.http_reqs.values         : {};
 
   const passed   = checks.passes  || 0;
   const failed   = checks.fails   || 0;
@@ -199,7 +201,6 @@ function buildReport(data) {
   const passRate = total > 0 ? ((passed / total) * 100).toFixed(2) : '0.00';
   const errRate  = errMetric.rate != null ? (errMetric.rate * 100).toFixed(2) : '0.00';
 
-  // Chart data arrays
   const labels  = txnValues.map(t => t.label);
   const avgData = txnValues.map(t => r(t.v.avg));
   const minData = txnValues.map(t => r(t.v.min));
@@ -211,16 +212,19 @@ function buildReport(data) {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>Checkout Load Test — Performance Report</title>
+  <title>Baseline Test — Performance Report</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
            margin: 0; background: #f1f5f9; color: #1e293b; }
-    .header { background: linear-gradient(135deg,#1e3a5f,#2563eb);
+    .header { background: linear-gradient(135deg,#14532d,#16a34a);
               color:#fff; padding:32px 40px; }
     .header h1 { margin:0 0 4px; font-size:1.8rem; }
     .header p  { margin:0; opacity:.75; font-size:.9rem; }
+    .scenario-badge { display:inline-block; background:rgba(255,255,255,.2);
+                      border-radius:99px; padding:3px 12px; font-size:.8rem;
+                      font-weight:700; margin-bottom:10px; letter-spacing:.05em; }
     .content   { max-width:1200px; margin:32px auto; padding:0 24px; }
     .card      { background:#fff; border-radius:12px;
                  box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:28px; overflow:hidden; }
@@ -245,7 +249,7 @@ function buildReport(data) {
                  font-size:.9rem; }
     tbody tr:last-child td { border-bottom:none; }
     tbody tr:hover { background:#f8fafc; }
-    .txn-name  { text-align:left; font-weight:600; color:#1e3a5f; }
+    .txn-name  { text-align:left; font-weight:600; color:#14532d; }
     .center    { text-align:center; }
     .badge     { display:inline-block; padding:2px 10px; border-radius:99px;
                  font-size:.75rem; font-weight:700; }
@@ -255,12 +259,12 @@ function buildReport(data) {
 </head>
 <body>
   <div class="header">
-    <h1>Checkout Load Test — Performance Report</h1>
-    <p>5 Virtual Users &nbsp;·&nbsp; 5 minutes &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
+    <div class="scenario-badge">BASELINE</div>
+    <h1>Baseline Load Test — Performance Report</h1>
+    <p>10 Virtual Users &nbsp;·&nbsp; 5 minutes &nbsp;·&nbsp; Threshold: p(95) &lt; 1500 ms &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
   </div>
   <div class="content">
 
-    <!-- KPIs -->
     <div class="card">
       <div class="card-title">Overall Summary</div>
       <div class="kpi-grid">
@@ -282,12 +286,11 @@ function buildReport(data) {
         <div class="kpi">
           <div class="kpi-label">Error Rate</div>
           <div class="kpi-value">${errRate}%</div>
-          <div class="kpi-sub">Threshold &lt; 5%</div>
+          <div class="kpi-sub">Threshold &lt; 1%</div>
         </div>
       </div>
     </div>
 
-    <!-- Charts -->
     <div class="charts-grid">
       <div class="card">
         <div class="card-title">Avg / p(90) / p(95) Response Time by Transaction</div>
@@ -299,7 +302,6 @@ function buildReport(data) {
       </div>
     </div>
 
-    <!-- Table -->
     <div class="card">
       <div class="card-title">Transaction Response Times</div>
       <table>
@@ -328,9 +330,7 @@ function buildReport(data) {
     const defaults = {
       responsive: true,
       plugins: { legend: { position: 'top' } },
-      scales: {
-        y: { beginAtZero: true, title: { display: true, text: 'ms' } }
-      }
+      scales: { y: { beginAtZero: true, title: { display: true, text: 'ms' } } }
     };
 
     new Chart(document.getElementById('chartPercentiles'), {
@@ -338,7 +338,7 @@ function buildReport(data) {
       data: {
         labels,
         datasets: [
-          { label: 'Avg',   data: avgData, backgroundColor: 'rgba(37,99,235,.7)'  },
+          { label: 'Avg',   data: avgData, backgroundColor: 'rgba(22,163,74,.7)'  },
           { label: 'p(90)', data: p90Data, backgroundColor: 'rgba(234,179,8,.7)'  },
           { label: 'p(95)', data: p95Data, backgroundColor: 'rgba(220,38,38,.7)'  },
         ]
@@ -364,8 +364,8 @@ function buildReport(data) {
 
 export function handleSummary(data) {
   return {
-    'test-results/checkout-results.json': JSON.stringify(data, null, 2),
-    'test-results/checkout-report.html':  buildReport(data),
+    'k6/results/baseline-results.json': JSON.stringify(data, null, 2),
+    'k6/results/baseline-report.html':  buildReport(data),
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
   };
 }

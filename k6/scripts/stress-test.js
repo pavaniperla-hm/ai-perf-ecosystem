@@ -3,7 +3,7 @@ import { check, group, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Rate, Trend } from 'k6/metrics';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
-import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from './grafana-config.js';
+import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from '../config/grafana-config.js';
 
 // ── Custom metrics ────────────────────────────────────────────────────────────
 const errorRate    = new Rate('errors');
@@ -14,7 +14,7 @@ const orderTrend   = new Trend('txn_checkout_page',       true);
 
 // ── Test data ─────────────────────────────────────────────────────────────────
 const customers = new SharedArray('customers', () =>
-  open('../../test-data/test-data-checkout.csv')
+  open('../data/test-data-checkout.csv')
     .split('\n').slice(1).filter(Boolean)
     .map(line => {
       const [
@@ -398,8 +398,8 @@ function buildReport(data) {
 
 export function handleSummary(data) {
   return {
-    'test-results/stress-results.json': JSON.stringify(data, null, 2),
-    'test-results/stress-report.html':  buildReport(data),
+    'k6/results/stress-results.json': JSON.stringify(data, null, 2),
+    'k6/results/stress-report.html':  buildReport(data),
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
   };
 }

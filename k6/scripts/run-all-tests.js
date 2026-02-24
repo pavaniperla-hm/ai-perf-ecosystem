@@ -23,7 +23,7 @@ const fs   = require('fs');
 const K6 = process.env.K6_PATH || 'k6';   // override with K6_PATH env var
 
 const TESTS_DIR   = path.join(__dirname);
-const RESULTS_DIR = path.join(__dirname, '..', '..', 'test-results');
+const RESULTS_DIR = path.join(__dirname, '..', 'results');
 
 const SCENARIOS = [
   {
@@ -92,7 +92,7 @@ function durationLabel(ms) {
   return `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
-// ── Ensure test-results directory exists ──────────────────────────────────────
+// ── Ensure k6/results directory exists ──────────────────────────────────────
 
 if (!fs.existsSync(RESULTS_DIR)) {
   fs.mkdirSync(RESULTS_DIR, { recursive: true });

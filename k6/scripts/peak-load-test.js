@@ -3,7 +3,7 @@ import { check, group, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Rate, Trend } from 'k6/metrics';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
-import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from './grafana-config.js';
+import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from '../config/grafana-config.js';
 
 // ── Custom metrics ────────────────────────────────────────────────────────────
 const errorRate    = new Rate('errors');
@@ -14,7 +14,7 @@ const orderTrend   = new Trend('txn_checkout_page',       true);
 
 // ── Test data ─────────────────────────────────────────────────────────────────
 const customers = new SharedArray('customers', () =>
-  open('../../test-data/test-data-checkout.csv')
+  open('../data/test-data-checkout.csv')
     .split('\n').slice(1).filter(Boolean)
     .map(line => {
       const [
@@ -35,27 +35,30 @@ const customers = new SharedArray('customers', () =>
 );
 
 // ── Options ───────────────────────────────────────────────────────────────────
-// Baseline: steady 10 VUs for 5 minutes — establishes normal performance baseline.
-// Thresholds are strict because load is minimal; any slowness here is real overhead.
+// Peak load: ramp 10→50 users over 2 min, hold for 5 min, ramp down over 1 min.
+// Models a realistic traffic spike (e.g. flash sale or marketing campaign).
 export const options = {
-  vus:      10,
-  duration: '5m',
+  stages: [
+    { duration: '2m', target: 50 },   // ramp up from 0 to 50 users
+    { duration: '5m', target: 50 },   // hold peak load
+    { duration: '1m', target: 0  },   // ramp down
+  ],
 
   thresholds: {
-    http_req_duration:       ['p(95)<1500'],   // tighter than peak/stress
-    errors:                  ['rate<0.01'],    // near-zero errors expected at baseline
+    http_req_duration:       ['p(95)<2000'],
+    errors:                  ['rate<0.03'],   // allow up to 3% errors at peak
 
-    txn_login_page:          ['p(95)<1500'],
-    txn_products_page:       ['p(95)<1500'],
-    txn_product_detail_page: ['p(95)<1500'],
-    txn_checkout_page:       ['p(95)<1500'],
+    txn_login_page:          ['p(95)<2000'],
+    txn_products_page:       ['p(95)<2000'],
+    txn_product_detail_page: ['p(95)<2000'],
+    txn_checkout_page:       ['p(95)<2000'],
   },
 
   // Tags are attached to every metric sent to Grafana — use them to filter
   // dashboards by test name or type across multiple runs.
   tags: {
-    testName: 'baseline-load',
-    testType: 'baseline',
+    testName: 'peak-load',
+    testType: 'peak',
   },
 };
 
@@ -173,7 +176,7 @@ function buildReport(data) {
     return { label, v: m ? m.values : {} };
   });
 
-  const statusBadge = (p95, threshold = 1500) =>
+  const statusBadge = (p95, threshold = 2000) =>
     p95 < threshold
       ? `<span class="badge pass">PASSED</span>`
       : `<span class="badge fail">FAILED</span>`;
@@ -212,13 +215,13 @@ function buildReport(data) {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>Baseline Test — Performance Report</title>
+  <title>Peak Load Test — Performance Report</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
            margin: 0; background: #f1f5f9; color: #1e293b; }
-    .header { background: linear-gradient(135deg,#14532d,#16a34a);
+    .header { background: linear-gradient(135deg,#92400e,#d97706);
               color:#fff; padding:32px 40px; }
     .header h1 { margin:0 0 4px; font-size:1.8rem; }
     .header p  { margin:0; opacity:.75; font-size:.9rem; }
@@ -229,7 +232,7 @@ function buildReport(data) {
     .card      { background:#fff; border-radius:12px;
                  box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:28px; overflow:hidden; }
     .card-title { padding:16px 20px; font-size:1rem; font-weight:700; color:#0f172a;
-                  border-bottom:1px solid #e2e8f0; background:#fff; }
+                  border-bottom:1px solid #e2e8f0; }
     .kpi-grid  { display:grid; grid-template-columns:repeat(4,1fr); gap:0; }
     .kpi       { padding:20px 24px; border-right:1px solid #e2e8f0; }
     .kpi:last-child { border-right:none; }
@@ -249,7 +252,7 @@ function buildReport(data) {
                  font-size:.9rem; }
     tbody tr:last-child td { border-bottom:none; }
     tbody tr:hover { background:#f8fafc; }
-    .txn-name  { text-align:left; font-weight:600; color:#14532d; }
+    .txn-name  { text-align:left; font-weight:600; color:#92400e; }
     .center    { text-align:center; }
     .badge     { display:inline-block; padding:2px 10px; border-radius:99px;
                  font-size:.75rem; font-weight:700; }
@@ -259,9 +262,9 @@ function buildReport(data) {
 </head>
 <body>
   <div class="header">
-    <div class="scenario-badge">BASELINE</div>
-    <h1>Baseline Load Test — Performance Report</h1>
-    <p>10 Virtual Users &nbsp;·&nbsp; 5 minutes &nbsp;·&nbsp; Threshold: p(95) &lt; 1500 ms &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
+    <div class="scenario-badge">PEAK LOAD</div>
+    <h1>Peak Load Test — Performance Report</h1>
+    <p>Ramp 0→50 users (2 min) &nbsp;·&nbsp; Hold 50 users (5 min) &nbsp;·&nbsp; Ramp down (1 min) &nbsp;·&nbsp; Threshold: p(95) &lt; 2000 ms &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
   </div>
   <div class="content">
 
@@ -286,7 +289,7 @@ function buildReport(data) {
         <div class="kpi">
           <div class="kpi-label">Error Rate</div>
           <div class="kpi-value">${errRate}%</div>
-          <div class="kpi-sub">Threshold &lt; 1%</div>
+          <div class="kpi-sub">Threshold &lt; 3%</div>
         </div>
       </div>
     </div>
@@ -338,7 +341,7 @@ function buildReport(data) {
       data: {
         labels,
         datasets: [
-          { label: 'Avg',   data: avgData, backgroundColor: 'rgba(22,163,74,.7)'  },
+          { label: 'Avg',   data: avgData, backgroundColor: 'rgba(217,119,6,.7)'  },
           { label: 'p(90)', data: p90Data, backgroundColor: 'rgba(234,179,8,.7)'  },
           { label: 'p(95)', data: p95Data, backgroundColor: 'rgba(220,38,38,.7)'  },
         ]
@@ -364,8 +367,8 @@ function buildReport(data) {
 
 export function handleSummary(data) {
   return {
-    'test-results/baseline-results.json': JSON.stringify(data, null, 2),
-    'test-results/baseline-report.html':  buildReport(data),
+    'k6/results/peak-load-results.json': JSON.stringify(data, null, 2),
+    'k6/results/peak-load-report.html':  buildReport(data),
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
   };
 }

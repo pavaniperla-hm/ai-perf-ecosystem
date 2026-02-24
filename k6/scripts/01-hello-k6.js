@@ -15,7 +15,7 @@ export default function () {
 
 export function handleSummary(data) {
   return {
-    'results/01-hello-k6-report.html': htmlReport(data),
+    'k6/results/01-hello-k6-report.html': htmlReport(data),
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
   };
 }

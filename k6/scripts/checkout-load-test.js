@@ -2,8 +2,8 @@ import http from 'k6/http';
 import { check, group, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Rate, Trend } from 'k6/metrics';
+import { htmlReport } from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
-import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from './grafana-config.js';
 
 // ── Custom metrics ────────────────────────────────────────────────────────────
 const errorRate    = new Rate('errors');
@@ -14,7 +14,7 @@ const orderTrend   = new Trend('txn_checkout_page',       true);
 
 // ── Test data ─────────────────────────────────────────────────────────────────
 const customers = new SharedArray('customers', () =>
-  open('../../test-data/test-data-checkout.csv')
+  open('../data/test-data-checkout.csv')
     .split('\n').slice(1).filter(Boolean)
     .map(line => {
       const [
@@ -35,30 +35,20 @@ const customers = new SharedArray('customers', () =>
 );
 
 // ── Options ───────────────────────────────────────────────────────────────────
-// Peak load: ramp 10→50 users over 2 min, hold for 5 min, ramp down over 1 min.
-// Models a realistic traffic spike (e.g. flash sale or marketing campaign).
 export const options = {
-  stages: [
-    { duration: '2m', target: 50 },   // ramp up from 0 to 50 users
-    { duration: '5m', target: 50 },   // hold peak load
-    { duration: '1m', target: 0  },   // ramp down
-  ],
+  vus:      5,
+  duration: '5m',
 
   thresholds: {
-    http_req_duration:       ['p(95)<2000'],
-    errors:                  ['rate<0.03'],   // allow up to 3% errors at peak
+    // Overall
+    http_req_duration: ['p(95)<2000'],
+    errors:            ['rate<0.05'],
 
+    // Per-transaction thresholds
     txn_login_page:          ['p(95)<2000'],
     txn_products_page:       ['p(95)<2000'],
     txn_product_detail_page: ['p(95)<2000'],
     txn_checkout_page:       ['p(95)<2000'],
-  },
-
-  // Tags are attached to every metric sent to Grafana — use them to filter
-  // dashboards by test name or type across multiple runs.
-  tags: {
-    testName: 'peak-load',
-    testType: 'peak',
   },
 };
 
@@ -68,6 +58,7 @@ const BASE = 'http://localhost';
 export default function () {
   const customer = customers[__VU % customers.length];
 
+  // ── Step 1: Login Page ────────────────────────────────────────────────────
   group('Login Page', () => {
     const start = Date.now();
     const res = http.get(
@@ -83,11 +74,13 @@ export default function () {
       },
     });
     errorRate.add(!ok);
+
     if (!ok) { sleep(1); return; }
   });
 
   sleep(1);
 
+  // ── Step 2: Products Page ─────────────────────────────────────────────────
   group('Products Page', () => {
     const start = Date.now();
     const res = http.get(
@@ -107,6 +100,7 @@ export default function () {
 
   sleep(2);
 
+  // ── Step 3: Product Detail Page ───────────────────────────────────────────
   group('Product Detail Page', () => {
     const start = Date.now();
     const res = http.get(
@@ -126,6 +120,7 @@ export default function () {
 
   sleep(1);
 
+  // ── Step 4: Checkout Page ─────────────────────────────────────────────────
   group('Checkout Page', () => {
     const payload = JSON.stringify({
       user_id:     customer.customer_id,
@@ -148,7 +143,7 @@ export default function () {
     orderTrend.add(Date.now() - start);
 
     const ok = check(res, {
-      'Checkout Page | Status 201':    r => r.status === 201,
+      'Checkout Page | Status 201':   r => r.status === 201,
       'Checkout Page | Order created': r => {
         try { return JSON.parse(r.body).id !== undefined; } catch { return false; }
       },
@@ -193,10 +188,10 @@ function buildReport(data) {
       <td class="center">${statusBadge(v['p(95)'])}</td>
     </tr>`).join('');
 
-  const checks    = data.metrics.checks           ? data.metrics.checks.values           : {};
-  const errMetric = data.metrics.errors            ? data.metrics.errors.values            : {};
-  const dur       = data.metrics.http_req_duration ? data.metrics.http_req_duration.values : {};
-  const reqs      = data.metrics.http_reqs         ? data.metrics.http_reqs.values         : {};
+  const checks   = data.metrics.checks           ? data.metrics.checks.values           : {};
+  const errMetric= data.metrics.errors            ? data.metrics.errors.values            : {};
+  const dur      = data.metrics.http_req_duration ? data.metrics.http_req_duration.values : {};
+  const reqs     = data.metrics.http_reqs         ? data.metrics.http_reqs.values         : {};
 
   const passed   = checks.passes  || 0;
   const failed   = checks.fails   || 0;
@@ -204,6 +199,7 @@ function buildReport(data) {
   const passRate = total > 0 ? ((passed / total) * 100).toFixed(2) : '0.00';
   const errRate  = errMetric.rate != null ? (errMetric.rate * 100).toFixed(2) : '0.00';
 
+  // Chart data arrays
   const labels  = txnValues.map(t => t.label);
   const avgData = txnValues.map(t => r(t.v.avg));
   const minData = txnValues.map(t => r(t.v.min));
@@ -215,24 +211,21 @@ function buildReport(data) {
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>Peak Load Test — Performance Report</title>
+  <title>Checkout Load Test — Performance Report</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
            margin: 0; background: #f1f5f9; color: #1e293b; }
-    .header { background: linear-gradient(135deg,#92400e,#d97706);
+    .header { background: linear-gradient(135deg,#1e3a5f,#2563eb);
               color:#fff; padding:32px 40px; }
     .header h1 { margin:0 0 4px; font-size:1.8rem; }
     .header p  { margin:0; opacity:.75; font-size:.9rem; }
-    .scenario-badge { display:inline-block; background:rgba(255,255,255,.2);
-                      border-radius:99px; padding:3px 12px; font-size:.8rem;
-                      font-weight:700; margin-bottom:10px; letter-spacing:.05em; }
     .content   { max-width:1200px; margin:32px auto; padding:0 24px; }
     .card      { background:#fff; border-radius:12px;
                  box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:28px; overflow:hidden; }
     .card-title { padding:16px 20px; font-size:1rem; font-weight:700; color:#0f172a;
-                  border-bottom:1px solid #e2e8f0; }
+                  border-bottom:1px solid #e2e8f0; background:#fff; }
     .kpi-grid  { display:grid; grid-template-columns:repeat(4,1fr); gap:0; }
     .kpi       { padding:20px 24px; border-right:1px solid #e2e8f0; }
     .kpi:last-child { border-right:none; }
@@ -252,7 +245,7 @@ function buildReport(data) {
                  font-size:.9rem; }
     tbody tr:last-child td { border-bottom:none; }
     tbody tr:hover { background:#f8fafc; }
-    .txn-name  { text-align:left; font-weight:600; color:#92400e; }
+    .txn-name  { text-align:left; font-weight:600; color:#1e3a5f; }
     .center    { text-align:center; }
     .badge     { display:inline-block; padding:2px 10px; border-radius:99px;
                  font-size:.75rem; font-weight:700; }
@@ -262,12 +255,12 @@ function buildReport(data) {
 </head>
 <body>
   <div class="header">
-    <div class="scenario-badge">PEAK LOAD</div>
-    <h1>Peak Load Test — Performance Report</h1>
-    <p>Ramp 0→50 users (2 min) &nbsp;·&nbsp; Hold 50 users (5 min) &nbsp;·&nbsp; Ramp down (1 min) &nbsp;·&nbsp; Threshold: p(95) &lt; 2000 ms &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
+    <h1>Checkout Load Test — Performance Report</h1>
+    <p>5 Virtual Users &nbsp;·&nbsp; 5 minutes &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
   </div>
   <div class="content">
 
+    <!-- KPIs -->
     <div class="card">
       <div class="card-title">Overall Summary</div>
       <div class="kpi-grid">
@@ -289,11 +282,12 @@ function buildReport(data) {
         <div class="kpi">
           <div class="kpi-label">Error Rate</div>
           <div class="kpi-value">${errRate}%</div>
-          <div class="kpi-sub">Threshold &lt; 3%</div>
+          <div class="kpi-sub">Threshold &lt; 5%</div>
         </div>
       </div>
     </div>
 
+    <!-- Charts -->
     <div class="charts-grid">
       <div class="card">
         <div class="card-title">Avg / p(90) / p(95) Response Time by Transaction</div>
@@ -305,6 +299,7 @@ function buildReport(data) {
       </div>
     </div>
 
+    <!-- Table -->
     <div class="card">
       <div class="card-title">Transaction Response Times</div>
       <table>
@@ -333,7 +328,9 @@ function buildReport(data) {
     const defaults = {
       responsive: true,
       plugins: { legend: { position: 'top' } },
-      scales: { y: { beginAtZero: true, title: { display: true, text: 'ms' } } }
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'ms' } }
+      }
     };
 
     new Chart(document.getElementById('chartPercentiles'), {
@@ -341,7 +338,7 @@ function buildReport(data) {
       data: {
         labels,
         datasets: [
-          { label: 'Avg',   data: avgData, backgroundColor: 'rgba(217,119,6,.7)'  },
+          { label: 'Avg',   data: avgData, backgroundColor: 'rgba(37,99,235,.7)'  },
           { label: 'p(90)', data: p90Data, backgroundColor: 'rgba(234,179,8,.7)'  },
           { label: 'p(95)', data: p95Data, backgroundColor: 'rgba(220,38,38,.7)'  },
         ]
@@ -367,8 +364,8 @@ function buildReport(data) {
 
 export function handleSummary(data) {
   return {
-    'test-results/peak-load-results.json': JSON.stringify(data, null, 2),
-    'test-results/peak-load-report.html':  buildReport(data),
+    'k6/results/checkout-results.json': JSON.stringify(data, null, 2),
+    'k6/results/checkout-report.html':  buildReport(data),
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
   };
 }
