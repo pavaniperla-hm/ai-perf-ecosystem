@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Realistic Load Test — Performance Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           margin: 0; background: #f1f5f9; color: #1e293b; }
+    .header { background: linear-gradient(135deg,#1e1b4b,#4f46e5);
+              color:#fff; padding:32px 40px; }
+    .header h1 { margin:0 0 4px; font-size:1.8rem; }
+    .header p  { margin:0; opacity:.75; font-size:.9rem; }
+    .scenario-badge { display:inline-block; background:rgba(255,255,255,.2);
+                      border-radius:99px; padding:3px 12px; font-size:.8rem;
+                      font-weight:700; margin-bottom:10px; letter-spacing:.05em; }
+    .content    { max-width:1280px; margin:32px auto; padding:0 24px; }
+    .card       { background:#fff; border-radius:12px;
+                  box-shadow:0 1px 4px rgba(0,0,0,.08); margin-bottom:28px; overflow:hidden; }
+    .card-title { padding:16px 20px; font-size:1rem; font-weight:700; color:#0f172a;
+                  border-bottom:1px solid #e2e8f0; }
+    .kpi-grid   { display:grid; grid-template-columns:repeat(4,1fr); gap:0; }
+    .kpi        { padding:20px 24px; border-right:1px solid #e2e8f0; }
+    .kpi:last-child { border-right:none; }
+    .kpi-label  { font-size:.72rem; color:#64748b; text-transform:uppercase;
+                  letter-spacing:.06em; margin-bottom:6px; }
+    .kpi-value  { font-size:1.6rem; font-weight:700; color:#0f172a; line-height:1; }
+    .kpi-sub    { font-size:.75rem; color:#94a3b8; margin-top:4px; }
+    /* Scenario allocation cards */
+    .scenario-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:0; }
+    .scenario-card { padding:18px 20px; border-right:1px solid #e2e8f0; }
+    .scenario-card:last-child { border-right:none; }
+    .sc-name   { font-size:.8rem; font-weight:700; color:#0f172a; margin-bottom:4px; }
+    .sc-weight { font-size:2rem; font-weight:800; line-height:1; margin-bottom:4px; }
+    .sc-vus    { font-size:.75rem; color:#64748b; }
+    .sc-bar    { height:6px; border-radius:3px; margin-top:10px; }
+    .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:28px; margin-bottom:28px; }
+    .chart-wrap  { padding:20px; }
+    .chart-wrap canvas { max-height:280px; }
+    table      { width:100%; border-collapse:collapse; }
+    thead th   { background:#f8fafc; padding:10px 16px; text-align:right;
+                 font-size:.75rem; text-transform:uppercase; letter-spacing:.05em;
+                 color:#475569; font-weight:600; border-bottom:2px solid #e2e8f0; }
+    thead th:first-child { text-align:left; }
+    thead th.center { text-align:center; }
+    tbody td   { padding:11px 16px; text-align:right; border-bottom:1px solid #f1f5f9;
+                 font-size:.9rem; }
+    tbody tr:last-child td { border-bottom:none; }
+    tbody tr:hover { background:#f8fafc; }
+    .txn-name  { text-align:left; font-weight:600; color:#1e1b4b; }
+    .center    { text-align:center; }
+    .badge     { display:inline-block; padding:2px 10px; border-radius:99px;
+                 font-size:.75rem; font-weight:700; }
+    .badge.pass { background:#dcfce7; color:#16a34a; }
+    .badge.fail { background:#fee2e2; color:#dc2626; }
+    .legend-pill { display:inline-block; width:10px; height:10px;
+                   border-radius:50%; margin-right:5px; vertical-align:middle; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="scenario-badge">REALISTIC LOAD — 4 WEIGHTED SCENARIOS</div>
+    <h1>Realistic Load Test — Performance Report</h1>
+    <p>Baseline: 10 VUs &nbsp;·&nbsp; Peak: 20 VUs &nbsp;·&nbsp; Duration: 13 min &nbsp;·&nbsp; Generated Tue, 24 Feb 2026 10:36:39 GMT</p>
+  </div>
+  <div class="content">
+
+    <!-- Scenario allocation -->
+    <div class="card">
+      <div class="card-title">Scenario Allocation</div>
+      <div class="scenario-grid">
+        <div class="scenario-card">
+          <div class="sc-name">Browse Products</div>
+          <div class="sc-weight" style="color:#4f46e5">60%</div>
+          <div class="sc-vus">6 baseline &rarr; 12 peak VUs</div>
+          <div class="sc-bar" style="background:#4f46e5;width:60%"></div>
+        </div>
+        <div class="scenario-card">
+          <div class="sc-name">Add to Cart</div>
+          <div class="sc-weight" style="color:#0ea5e9">25%</div>
+          <div class="sc-vus">2 baseline &rarr; 5 peak VUs</div>
+          <div class="sc-bar" style="background:#0ea5e9;width:25%"></div>
+        </div>
+        <div class="scenario-card">
+          <div class="sc-name">Full Checkout</div>
+          <div class="sc-weight" style="color:#16a34a">10%</div>
+          <div class="sc-vus">1 baseline &rarr; 2 peak VUs</div>
+          <div class="sc-bar" style="background:#16a34a;width:10%"></div>
+        </div>
+        <div class="scenario-card">
+          <div class="sc-name">Order History</div>
+          <div class="sc-weight" style="color:#d97706">5%</div>
+          <div class="sc-vus">1 baseline &rarr; 1 peak VUs</div>
+          <div class="sc-bar" style="background:#d97706;width:5%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overall KPIs -->
+    <div class="card">
+      <div class="card-title">Overall Summary</div>
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-label">Total Requests</div>
+          <div class="kpi-value">4791</div>
+          <div class="kpi-sub">6.11 req/s</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Avg Response Time</div>
+          <div class="kpi-value">11 ms</div>
+          <div class="kpi-sub">p(95) = 23 ms</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Check Pass Rate</div>
+          <div class="kpi-value">100.00%</div>
+          <div class="kpi-sub">9582 passed / 0 failed</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Peak VUs</div>
+          <div class="kpi-value">20</div>
+          <div class="kpi-sub">across 4 weighted scenarios</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="card">
+        <div class="card-title">Avg / p(90) / p(95) — by Transaction</div>
+        <div class="chart-wrap"><canvas id="chartPercentiles"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Scenario Load Distribution</div>
+        <div class="chart-wrap"><canvas id="chartScenarios"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Per-transaction response times -->
+    <div class="card">
+      <div class="card-title">Transaction Response Times (aggregated across all scenarios)</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">Transaction</th>
+            <th>Avg</th><th>Min</th><th>Max</th>
+            <th>Median</th><th>p(90)</th><th>p(95)</th>
+            <th class="center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+    <tr>
+      <td class="txn-name">Products List</td>
+      <td>10 ms</td>
+      <td>0 ms</td>
+      <td>100 ms</td>
+      <td>9 ms</td>
+      <td>13 ms</td>
+      <td>16 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Product Detail</td>
+      <td>9 ms</td>
+      <td>1 ms</td>
+      <td>74 ms</td>
+      <td>8 ms</td>
+      <td>12 ms</td>
+      <td>15 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">User Login</td>
+      <td>16 ms</td>
+      <td>6 ms</td>
+      <td>214 ms</td>
+      <td>15 ms</td>
+      <td>20 ms</td>
+      <td>24 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Place Order</td>
+      <td>25 ms</td>
+      <td>11 ms</td>
+      <td>125 ms</td>
+      <td>24 ms</td>
+      <td>30 ms</td>
+      <td>37 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Order History</td>
+      <td>17 ms</td>
+      <td>7 ms</td>
+      <td>186 ms</td>
+      <td>16 ms</td>
+      <td>21 ms</td>
+      <td>27 ms</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr></tbody>
+      </table>
+    </div>
+
+    <!-- Per-scenario error summary -->
+    <div class="card">
+      <div class="card-title">Scenario Error Summary</div>
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align:left">Scenario</th>
+            <th class="center">Load Weight</th>
+            <th class="center">VUs (baseline → peak)</th>
+            <th class="center">Error Rate</th>
+            <th class="center">Threshold</th>
+            <th class="center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+    <tr>
+      <td class="txn-name">Browse Products</td>
+      <td class="center">60%</td>
+      <td class="center">6 → 12</td>
+      <td class="center">0.00%</td>
+      <td class="center">1%</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Add to Cart</td>
+      <td class="center">25%</td>
+      <td class="center">2 → 5</td>
+      <td class="center">0.00%</td>
+      <td class="center">2%</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Full Checkout</td>
+      <td class="center">10%</td>
+      <td class="center">1 → 2</td>
+      <td class="center">0.00%</td>
+      <td class="center">1%</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr>
+    <tr>
+      <td class="txn-name">Order History</td>
+      <td class="center">5%</td>
+      <td class="center">1 → 1</td>
+      <td class="center">0.00%</td>
+      <td class="center">2%</td>
+      <td class="center"><span class="badge pass">PASSED</span></td>
+    </tr></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    const txnLabels = ["Products List","Product Detail","User Login","Place Order","Order History"];
+    const avgData   = [10,9,16,25,17];
+    const p90Data   = [13,12,20,30,21];
+    const p95Data   = [16,15,24,37,27];
+    const minData   = [0,1,6,11,7];
+    const maxData   = [100,74,214,125,186];
+
+    const scenarioLabels  = ["Browse Products","Add to Cart","Full Checkout","Order History"];
+    const scenarioWeights = [60,25,10,5];
+
+    new Chart(document.getElementById('chartPercentiles'), {
+      type: 'bar',
+      data: {
+        labels: txnLabels,
+        datasets: [
+          { label: 'Avg',   data: avgData, backgroundColor: 'rgba(79,70,229,.7)'  },
+          { label: 'p(90)', data: p90Data, backgroundColor: 'rgba(234,179,8,.7)'  },
+          { label: 'p(95)', data: p95Data, backgroundColor: 'rgba(220,38,38,.7)'  },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: 'top' } },
+        scales: { y: { beginAtZero: true, title: { display: true, text: 'ms' } } }
+      }
+    });
+
+    new Chart(document.getElementById('chartScenarios'), {
+      type: 'doughnut',
+      data: {
+        labels: scenarioLabels,
+        datasets: [{
+          data: scenarioWeights,
+          backgroundColor: [
+            'rgba(79,70,229,.8)',
+            'rgba(14,165,233,.8)',
+            'rgba(22,163,74,.8)',
+            'rgba(217,119,6,.8)',
+          ],
+          borderWidth: 2,
+          borderColor: '#fff',
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'right' },
+          tooltip: {
+            callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + '% of load' }
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

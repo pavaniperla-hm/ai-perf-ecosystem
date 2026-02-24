@@ -47,7 +47,7 @@ const trendOrderHistory  = new Trend('txn_order_history',   true);
 //   0 → baseline (2 min ramp) → hold 3 min → peak (2 min ramp) → hold 5 min → 0 (1 min)
 //
 // Baseline distribution (10 VUs total):  browse=6  cart=2  checkout=1  history=1
-// Peak distribution    (50 VUs total):   browse=30 cart=12 checkout=6  history=2
+// Peak distribution    (20 VUs total):   browse=12 cart=5  checkout=2  history=1
 export const options = {
   scenarios: {
 
@@ -58,8 +58,8 @@ export const options = {
       stages: [
         { duration: '2m', target: 6  },   // ramp to baseline
         { duration: '3m', target: 6  },   // hold baseline
-        { duration: '2m', target: 30 },   // ramp to peak
-        { duration: '5m', target: 30 },   // hold peak
+        { duration: '2m', target: 12 },   // ramp to peak
+        { duration: '5m', target: 12 },   // hold peak
         { duration: '1m', target: 0  },   // ramp down
       ],
     },
@@ -71,9 +71,9 @@ export const options = {
       stages: [
         { duration: '2m', target: 2  },
         { duration: '3m', target: 2  },
-        { duration: '2m', target: 12 },
-        { duration: '5m', target: 12 },
-        { duration: '1m', target: 0  },
+        { duration: '2m', target: 5 },
+        { duration: '5m', target: 5 },
+        { duration: '1m', target: 0 },
       ],
     },
 
@@ -84,8 +84,8 @@ export const options = {
       stages: [
         { duration: '2m', target: 1 },
         { duration: '3m', target: 1 },
-        { duration: '2m', target: 6 },
-        { duration: '5m', target: 6 },
+        { duration: '2m', target: 2 },
+        { duration: '5m', target: 2 },
         { duration: '1m', target: 0 },
       ],
     },
@@ -97,8 +97,8 @@ export const options = {
       stages: [
         { duration: '2m', target: 1 },
         { duration: '3m', target: 1 },
-        { duration: '2m', target: 2 },
-        { duration: '5m', target: 2 },
+        { duration: '2m', target: 1 },
+        { duration: '5m', target: 1 },
         { duration: '1m', target: 0 },
       ],
     },
@@ -425,10 +425,10 @@ function buildReport(data) {
 
   // ── Scenario error rows ────────────────────────────────────────────────────
   const scenarios = [
-    { label: 'Browse Products', metric: 'errors_browse',   weight: '60%', baseline: '6',  peak: '30', threshold: 0.01 },
-    { label: 'Add to Cart',     metric: 'errors_cart',     weight: '25%', baseline: '2',  peak: '12', threshold: 0.02 },
-    { label: 'Full Checkout',   metric: 'errors_checkout', weight: '10%', baseline: '1',  peak: '6',  threshold: 0.01 },
-    { label: 'Order History',   metric: 'errors_history',  weight: '5%',  baseline: '1',  peak: '2',  threshold: 0.02 },
+    { label: 'Browse Products', metric: 'errors_browse',   weight: '60%', baseline: '6',  peak: '12', threshold: 0.01 },
+    { label: 'Add to Cart',     metric: 'errors_cart',     weight: '25%', baseline: '2',  peak: '5',  threshold: 0.02 },
+    { label: 'Full Checkout',   metric: 'errors_checkout', weight: '10%', baseline: '1',  peak: '2',  threshold: 0.01 },
+    { label: 'Order History',   metric: 'errors_history',  weight: '5%',  baseline: '1',  peak: '1',  threshold: 0.02 },
   ];
 
   const scenarioRows = scenarios.map(({ label, metric, weight, baseline, peak, threshold }) => {
@@ -530,7 +530,7 @@ function buildReport(data) {
   <div class="header">
     <div class="scenario-badge">REALISTIC LOAD — 4 WEIGHTED SCENARIOS</div>
     <h1>Realistic Load Test — Performance Report</h1>
-    <p>Baseline: 10 VUs &nbsp;·&nbsp; Peak: 50 VUs &nbsp;·&nbsp; Duration: 13 min &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
+    <p>Baseline: 10 VUs &nbsp;·&nbsp; Peak: 20 VUs &nbsp;·&nbsp; Duration: 13 min &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
   </div>
   <div class="content">
 
@@ -541,25 +541,25 @@ function buildReport(data) {
         <div class="scenario-card">
           <div class="sc-name">Browse Products</div>
           <div class="sc-weight" style="color:#4f46e5">60%</div>
-          <div class="sc-vus">6 baseline &rarr; 30 peak VUs</div>
+          <div class="sc-vus">6 baseline &rarr; 12 peak VUs</div>
           <div class="sc-bar" style="background:#4f46e5;width:60%"></div>
         </div>
         <div class="scenario-card">
           <div class="sc-name">Add to Cart</div>
           <div class="sc-weight" style="color:#0ea5e9">25%</div>
-          <div class="sc-vus">2 baseline &rarr; 12 peak VUs</div>
+          <div class="sc-vus">2 baseline &rarr; 5 peak VUs</div>
           <div class="sc-bar" style="background:#0ea5e9;width:25%"></div>
         </div>
         <div class="scenario-card">
           <div class="sc-name">Full Checkout</div>
           <div class="sc-weight" style="color:#16a34a">10%</div>
-          <div class="sc-vus">1 baseline &rarr; 6 peak VUs</div>
+          <div class="sc-vus">1 baseline &rarr; 2 peak VUs</div>
           <div class="sc-bar" style="background:#16a34a;width:10%"></div>
         </div>
         <div class="scenario-card">
           <div class="sc-name">Order History</div>
           <div class="sc-weight" style="color:#d97706">5%</div>
-          <div class="sc-vus">1 baseline &rarr; 2 peak VUs</div>
+          <div class="sc-vus">1 baseline &rarr; 1 peak VUs</div>
           <div class="sc-bar" style="background:#d97706;width:5%"></div>
         </div>
       </div>
@@ -586,7 +586,7 @@ function buildReport(data) {
         </div>
         <div class="kpi">
           <div class="kpi-label">Peak VUs</div>
-          <div class="kpi-value">50</div>
+          <div class="kpi-value">20</div>
           <div class="kpi-sub">across 4 weighted scenarios</div>
         </div>
       </div>
@@ -689,7 +689,7 @@ function buildReport(data) {
         plugins: {
           legend: { position: 'right' },
           tooltip: {
-            callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}% of load` }
+            callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + '% of load' }
           }
         }
       }
