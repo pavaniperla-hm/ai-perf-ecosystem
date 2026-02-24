@@ -3,6 +3,7 @@ import { check, group, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Rate, Trend } from 'k6/metrics';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from './grafana-config.js';
 
 // ── Custom metrics ────────────────────────────────────────────────────────────
 const errorRate    = new Rate('errors');
@@ -54,6 +55,13 @@ export const options = {
     txn_products_page:       ['p(95)<3000'],
     txn_product_detail_page: ['p(95)<3000'],
     txn_checkout_page:       ['p(95)<3000'],
+  },
+
+  // Tags are attached to every metric sent to Grafana — use them to filter
+  // dashboards by test name or type across multiple runs.
+  tags: {
+    testName: 'stress-test',
+    testType: 'stress',
   },
 };
 

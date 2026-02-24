@@ -3,6 +3,7 @@ import { check, group, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
 import { Rate, Trend } from 'k6/metrics';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from './grafana-config.js';
 
 // ── Shared test data ──────────────────────────────────────────────────────────
 // Loaded once, shared across all VUs and all scenarios.
@@ -120,6 +121,13 @@ export const options = {
     txn_user_login:     ['p(95)<1500'],
     txn_create_order:   ['p(95)<2000'],
     txn_order_history:  ['p(95)<1500'],
+  },
+
+  // Tags are attached to every metric sent to Grafana — use them to filter
+  // dashboards by test name or type across multiple runs.
+  tags: {
+    testName: 'realistic-load',
+    testType: 'realistic',
   },
 };
 
