@@ -20,8 +20,8 @@
  *     $env:K6_PROMETHEUS_RW_USERNAME   = "2997542"
  *     $env:K6_PROMETHEUS_RW_PASSWORD   = "<your Grafana API token>"
  *
- *   Bash (macOS / Linux / WSL):
- *     export $(grep -v '^#' .env | xargs)
+ *   Bash / Git Bash (Windows):
+ *     set -a && source <(tr -d '\r' < .env) && set +a
  *
  * Step 3 — Run any test with the Grafana output flag:
  *   "C:\Program Files\k6\k6.exe" run --out experimental-prometheus-rw tests/k6/baseline-test.js

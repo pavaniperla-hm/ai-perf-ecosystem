@@ -135,6 +135,20 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Log Shipping ───────────────────────────────────────────────────────────
+
+  promtail:
+    image: grafana/promtail:3.0.0
+    volumes:
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
+    environment:
+      LOKI_URL: ${LOKI_URL}
+      LOKI_USERNAME: ${LOKI_USERNAME}
+      LOKI_PASSWORD: ${LOKI_PASSWORD}
+    restart: unless-stopped
+
 volumes:
   user-db-data:
   product-db-data:
