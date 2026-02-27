@@ -27,6 +27,7 @@ htmlcov/
 # ── Node.js ───────────────────────────────────────────────
 node_modules/
 !product-service/node_modules/
+!frontend/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
