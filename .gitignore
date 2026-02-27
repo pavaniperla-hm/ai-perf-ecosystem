@@ -8,6 +8,8 @@ __pycache__/
 *.egg-info/
 dist/
 !frontend/dist/
+!product-service/node_modules/**/dist/
+!frontend/node_modules/**/dist/
 build/
 .eggs/
 .venv/
