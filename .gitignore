@@ -31,6 +31,13 @@ htmlcov/
 node_modules/
 !product-service/node_modules/
 !frontend/node_modules/
+# Allow all subdirectory patterns that gitignore would otherwise block
+# inside the two vendored node_modules trees:
+!product-service/node_modules/**/node_modules/
+!frontend/node_modules/**/node_modules/
+!product-service/node_modules/**/build/
+!frontend/node_modules/**/build/
+!frontend/node_modules/**/env/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -39,7 +46,8 @@ yarn-error.log*
 .yarn-integrity
 .node_repl_history
 *.tgz
-package-lock.json   # keep or remove depending on team preference
+package-lock.json
+!product-service/package-lock.json
 
 # ── Docker ────────────────────────────────────────────────
 .dockerignore        # per-service files are fine; ignore accidental root one
