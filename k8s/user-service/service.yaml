@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: perf-demo
+  labels:
+    app: user-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: user-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8001

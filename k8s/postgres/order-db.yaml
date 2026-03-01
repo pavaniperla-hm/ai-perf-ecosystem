@@ -1,0 +1,77 @@
+---
+# PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: order-db-pvc
+  namespace: perf-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-db
+  namespace: perf-demo
+  labels:
+    app: order-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-db
+  template:
+    metadata:
+      labels:
+        app: order-db
+    spec:
+      containers:
+        - name: order-db
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: orderdb
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: postgres
+          volumeMounts:
+            - name: order-db-storage
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "orderdb"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: order-db-storage
+          persistentVolumeClaim:
+            claimName: order-db-pvc
+---
+# ClusterIP Service (internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-db
+  namespace: perf-demo
+spec:
+  type: ClusterIP
+  selector:
+    app: order-db
+  ports:
+    - port: 5432
+      targetPort: 5432

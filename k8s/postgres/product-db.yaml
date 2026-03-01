@@ -1,0 +1,77 @@
+---
+# PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: product-db-pvc
+  namespace: perf-demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-db
+  namespace: perf-demo
+  labels:
+    app: product-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-db
+  template:
+    metadata:
+      labels:
+        app: product-db
+    spec:
+      containers:
+        - name: product-db
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: productdb
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: postgres
+          volumeMounts:
+            - name: product-db-storage
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres", "-d", "productdb"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: product-db-storage
+          persistentVolumeClaim:
+            claimName: product-db-pvc
+---
+# ClusterIP Service (internal only)
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-db
+  namespace: perf-demo
+spec:
+  type: ClusterIP
+  selector:
+    app: product-db
+  ports:
+    - port: 5432
+      targetPort: 5432
