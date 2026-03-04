@@ -10,6 +10,5 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN sed -i 's/\r//' start.sh && chmod +x start.sh
 
-CMD ["./start.sh"]
+CMD ["/bin/bash", "-c", "python seed.py && exec uvicorn main:app --host 0.0.0.0 --port ${SERVICE_PORT:-8001}"]
