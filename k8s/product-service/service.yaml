@@ -6,7 +6,7 @@ metadata:
   labels:
     app: product-service
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: product-service
   ports:
