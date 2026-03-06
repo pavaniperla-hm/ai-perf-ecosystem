@@ -217,9 +217,10 @@ Close the loop with automated analysis.
 - [x] AKS databases seeded: 10K users, 5K products, 50K orders
 
 ### Log Shipping (Loki)
-- [x] Local Docker: Promtail in docker-compose, Docker socket discovery, job=docker-compose
-- [x] AKS: Promtail DaemonSet in `k8s/promtail/` — 8/8 pods discovered, shipping to Loki
-- [ ] **Pending**: Replace Prometheus-write token with a Loki-write token in both envs (see Loki Token section below)
+- [x] Local Docker: Promtail in docker-compose, Docker socket discovery, `job="docker-compose"`
+- [x] AKS: Promtail DaemonSet in `k8s/promtail/` — 8/8 pods discovered, 81K+ entries shipped
+- [x] Grafana Loki verified — query `{namespace="perf-demo"}` shows all AKS service logs
+- [x] analysis-agent.md reads `LOKI_QUERY_FILTER` from `.env.active` (env-aware queries)
 
 ### k6 Load Testing
 - [x] `k6/config/config.js` — environment switcher (`TARGET_ENV=local` or `aks`, defaults to AKS `http://20.82.174.115`)
@@ -363,30 +364,21 @@ This causes 0/0 targets. Fix by injecting the actual node name via the downward 
 `action: drop` with `regex: ""` is parsed as `regex: null` → matches everything → drops all pods.
 Never use an empty regex as a guard. Remove the rule or use a real exclusion pattern.
 
-**10. Grafana Cloud token scopes — Prometheus write ≠ Loki write**
-The k6 metrics write token (`k6-metrics-write-k6-token`) has Prometheus write scope only.
-Loki push requires a separate token with `logs:write` scope. Create it in Grafana Cloud
-Access Policies and apply it as the `GRAFANA_API_TOKEN` in the AKS secret and `LOKI_PASSWORD` in `.env`.
+**10. Grafana Cloud token — use the same token for Prometheus and Loki**
+The existing `k6-metrics-write-k6-token` has both `metrics:write` and `logs:write` scope.
+Use the same `LOKI_PASSWORD` / `GRAFANA_API_TOKEN` for both Prometheus remote write and Loki push.
 
-### Loki Token Setup
-
-To get the correct Loki write token:
-1. Go to Grafana Cloud → your org → **Access Policies**
-2. Create a policy with scope `logs:write` (can combine with `metrics:write`)
-3. Generate a token for that policy
-4. Update AKS secret:
+**11. AKS secret creation — strip CRLF from token before applying**
+`source .env` on Windows bash includes `\r` characters, which silently corrupts the token
+and produces an empty or invalid secret value. Always extract with `tr -d '\r'`:
 ```bash
+TOKEN=$(grep "^LOKI_PASSWORD=" .env | tr -d '\r' | cut -d'=' -f2-)
 kubectl create secret generic grafana-credentials \
   --namespace perf-demo \
-  --from-literal=GRAFANA_API_TOKEN="<LOKI_TOKEN>" \
+  --from-literal=GRAFANA_API_TOKEN="${TOKEN}" \
   --from-literal=LOKI_USERNAME="1494446" \
   --from-literal=LOKI_URL="https://logs-prod-025.grafana.net" \
   --dry-run=client -o yaml | kubectl apply -f -
-kubectl rollout restart daemonset/promtail -n perf-demo
-```
-5. Update local `.env` with `LOKI_PASSWORD=<LOKI_TOKEN>` and restart promtail:
-```bash
-docker compose up -d --force-recreate promtail
 ```
 
 ## k6 Load Testing
