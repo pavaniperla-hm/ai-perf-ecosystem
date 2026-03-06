@@ -213,6 +213,20 @@ Close the loop with automated analysis.
 - [x] All services running: user-service, product-service, order-service, frontend + 3 PostgreSQL DBs
 - [x] Nginx ingress controller — single public IP `20.82.174.115` for all routes
 - [x] Frontend live at `http://20.82.174.115`
+- [x] AKS MCP connections: `user-db-aks` (:15433), `product-db-aks` (:15434), `order-db-aks` (:15435) via kubectl port-forward
+- [x] AKS databases seeded: 10K users, 5K products, 50K orders
+
+### k6 Load Testing
+- [x] `k6/config/config.js` — environment switcher (`TARGET_ENV=local` or `aks`, defaults to AKS `http://20.82.174.115`)
+- [x] `k6/config/grafana-config.js` — Grafana Cloud Prometheus remote write settings
+- [x] `k6/scripts/baseline-test.js` — 10 VUs, 5 min, 4 transaction groups with custom trends
+- [x] `k6/scripts/stress-test.js` — stepped ramp 10→25→50→100 VUs
+- [x] `k6/scripts/peak-load-test.js` — ramp to 50 VUs, hold, ramp down
+- [x] `k6/scripts/realistic-load-test.js` — 4 weighted scenarios (browse/cart/checkout/history)
+- [x] `k6/scripts/generate-test-data.js` — Node.js script to regenerate CSV from any env
+- [x] `k6/data/test-data-checkout.csv` — 500 rows regenerated from AKS databases
+- [x] Grafana Cloud integration working — metrics streaming via Prometheus remote write
+- [x] Baseline test result: p(95)=52ms, 0% errors, 7.74 req/s at 10 VUs over 5 min
 
 ---
 
@@ -321,3 +335,73 @@ controller instead of `LoadBalancer` type per service. All services use `Cluster
 
 **7. ACR Tasks not available on Basic tier**
 `az acr build` requires Standard or Premium ACR tier. Use WSL2 builds instead.
+
+## k6 Load Testing
+
+### Directory Structure
+```
+k6/
+├── config/
+│   ├── config.js           # BASE URL switcher — TARGET_ENV=local|aks (default: aks)
+│   └── grafana-config.js   # Grafana Cloud / Prometheus remote write settings
+├── data/
+│   └── test-data-checkout.csv   # 500 rows from AKS DBs (regenerate with generate-test-data.js)
+├── scripts/
+│   ├── baseline-test.js         # 10 VUs, 5 min steady state — establishes baseline
+│   ├── stress-test.js           # Stepped ramp 10→25→50→100 VUs — find breaking point
+│   ├── peak-load-test.js        # Ramp to 50 VUs, hold 5 min — peak traffic model
+│   ├── realistic-load-test.js   # 4 weighted scenarios (browse/cart/checkout/history)
+│   ├── 01-hello-k6.js           # Intro smoke test
+│   ├── run-all-tests.js         # Orchestrator: node k6/scripts/run-all-tests.js
+│   └── generate-test-data.js    # Regenerate CSV: node k6/scripts/generate-test-data.js [local|aks]
+└── results/
+    └── *.html / *.json          # Auto-generated HTML reports + raw JSON
+```
+
+### Running Tests
+
+**Step 1 — Load credentials (once per shell session):**
+```bash
+set -a && source <(tr -d '\r' < .env) && set +a
+```
+
+**Step 2 — Start AKS port-forwards (if using AKS MCP servers):**
+```bash
+kubectl port-forward -n perf-demo svc/user-db 15433:5432 &
+kubectl port-forward -n perf-demo svc/product-db 15434:5432 &
+kubectl port-forward -n perf-demo svc/order-db 15435:5432 &
+```
+
+**Step 3 — Run a test:**
+```bash
+# With Grafana output (recommended)
+k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
+k6 run --out experimental-prometheus-rw k6/scripts/stress-test.js
+k6 run --out experimental-prometheus-rw k6/scripts/peak-load-test.js
+k6 run --out experimental-prometheus-rw k6/scripts/realistic-load-test.js
+
+# Quick smoke test (no Grafana)
+k6 run --vus 2 --duration 30s k6/scripts/baseline-test.js
+
+# Target local Docker stack instead of AKS
+TARGET_ENV=local k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
+```
+
+### Grafana Cloud
+| Setting | Value |
+|---|---|
+| Stack URL | `https://myperformanceproject.grafana.net` |
+| Prometheus endpoint | `https://prometheus-prod-39-prod-eu-north-0.grafana.net/api/prom/push` |
+| Username | `2997542` |
+| Password | stored in `.env` as `K6_PROMETHEUS_RW_PASSWORD` |
+
+### Baseline Performance Results (AKS, 2026-03-06)
+| Transaction | Avg | p(90) | p(95) | Threshold |
+|---|---|---|---|---|
+| Login Page | 42.84ms | 48ms | 52ms | <1500ms ✅ |
+| Products Page | 40.28ms | 44ms | 47ms | <1500ms ✅ |
+| Product Detail | 36.72ms | 40ms | 42ms | <1500ms ✅ |
+| Checkout | 47.48ms | 53ms | 56ms | <1500ms ✅ |
+| **Overall** | **41.62ms** | **49ms** | **52ms** | **<1500ms ✅** |
+
+Load: 10 VUs · 5 min · 590 iterations · 2,360 requests · 7.74 req/s · 0% errors

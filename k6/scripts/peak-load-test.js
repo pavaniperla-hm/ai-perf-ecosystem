@@ -4,6 +4,7 @@ import { SharedArray } from 'k6/data';
 import { Rate, Trend } from 'k6/metrics';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 import { PROMETHEUS_RW_URL, PROMETHEUS_USERNAME } from '../config/grafana-config.js';
+import { BASE } from '../config/config.js';
 
 // ── Custom metrics ────────────────────────────────────────────────────────────
 const errorRate    = new Rate('errors');
@@ -62,7 +63,7 @@ export const options = {
   },
 };
 
-const BASE = 'http://localhost';
+// BASE is imported from ../config/config.js — set TARGET_ENV=local to target Docker
 
 // ── Main scenario ─────────────────────────────────────────────────────────────
 export default function () {
