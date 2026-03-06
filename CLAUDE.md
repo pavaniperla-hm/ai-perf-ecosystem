@@ -216,6 +216,11 @@ Close the loop with automated analysis.
 - [x] AKS MCP connections: `user-db-aks` (:15433), `product-db-aks` (:15434), `order-db-aks` (:15435) via kubectl port-forward
 - [x] AKS databases seeded: 10K users, 5K products, 50K orders
 
+### Log Shipping (Loki)
+- [x] Local Docker: Promtail in docker-compose, Docker socket discovery, job=docker-compose
+- [x] AKS: Promtail DaemonSet in `k8s/promtail/` — 8/8 pods discovered, shipping to Loki
+- [ ] **Pending**: Replace Prometheus-write token with a Loki-write token in both envs (see Loki Token section below)
+
 ### k6 Load Testing
 - [x] `k6/config/config.js` — environment switcher (`TARGET_ENV=local` or `aks`, defaults to AKS `http://20.82.174.115`)
 - [x] `k6/config/grafana-config.js` — Grafana Cloud Prometheus remote write settings
@@ -273,6 +278,13 @@ k8s/
 │   └── service.yaml
 ├── ingress/
 │   └── ingress.yaml              # Nginx ingress — 4 separate Ingress objects
+├── promtail/
+│   ├── configmap.yaml            # Kubernetes pod log discovery, ships to Loki
+│   ├── secret.yaml               # Template only — apply credentials via kubectl directly
+│   ├── serviceaccount.yaml       # ServiceAccount: promtail in perf-demo
+│   ├── clusterrole.yaml          # get/watch/list nodes, pods, services, endpoints, namespaces
+│   ├── clusterrolebinding.yaml   # Bind ClusterRole to promtail ServiceAccount
+│   └── daemonset.yaml            # grafana/promtail:3.0.0 DaemonSet
 ├── deploy.sh                     # Full deploy script with rollout waits
 └── build-and-push.sh             # Build & push all images (ARM64)
 ```
@@ -335,6 +347,47 @@ controller instead of `LoadBalancer` type per service. All services use `Cluster
 
 **7. ACR Tasks not available on Basic tier**
 `az acr build` requires Standard or Premium ACR tier. Use WSL2 builds instead.
+
+**8. Promtail DaemonSet — HOSTNAME must be the node name, not the pod name**
+Promtail auto-adds `spec.nodeName=$(HOSTNAME)` to only discover pods on its own node.
+In Kubernetes, `HOSTNAME` defaults to the pod name (e.g. `promtail-7nffn`), not the node name.
+This causes 0/0 targets. Fix by injecting the actual node name via the downward API:
+```yaml
+- name: HOSTNAME
+  valueFrom:
+    fieldRef:
+      fieldPath: spec.nodeName
+```
+
+**9. Promtail drop rule with empty regex drops all targets**
+`action: drop` with `regex: ""` is parsed as `regex: null` → matches everything → drops all pods.
+Never use an empty regex as a guard. Remove the rule or use a real exclusion pattern.
+
+**10. Grafana Cloud token scopes — Prometheus write ≠ Loki write**
+The k6 metrics write token (`k6-metrics-write-k6-token`) has Prometheus write scope only.
+Loki push requires a separate token with `logs:write` scope. Create it in Grafana Cloud
+Access Policies and apply it as the `GRAFANA_API_TOKEN` in the AKS secret and `LOKI_PASSWORD` in `.env`.
+
+### Loki Token Setup
+
+To get the correct Loki write token:
+1. Go to Grafana Cloud → your org → **Access Policies**
+2. Create a policy with scope `logs:write` (can combine with `metrics:write`)
+3. Generate a token for that policy
+4. Update AKS secret:
+```bash
+kubectl create secret generic grafana-credentials \
+  --namespace perf-demo \
+  --from-literal=GRAFANA_API_TOKEN="<LOKI_TOKEN>" \
+  --from-literal=LOKI_USERNAME="1494446" \
+  --from-literal=LOKI_URL="https://logs-prod-025.grafana.net" \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl rollout restart daemonset/promtail -n perf-demo
+```
+5. Update local `.env` with `LOKI_PASSWORD=<LOKI_TOKEN>` and restart promtail:
+```bash
+docker compose up -d --force-recreate promtail
+```
 
 ## k6 Load Testing
 

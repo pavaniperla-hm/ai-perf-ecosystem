@@ -57,21 +57,22 @@ received from the Execution Agent.
 
 ### Authentication
 
-- **Base URL:** `https://logs-prod-025.grafana.net`
-- **Method:** HTTP Basic Auth
-- **Username:** `1494446`
-- **Password:** read `LOKI_PASSWORD` from `.env` file in the project root
-  (never hardcode; load dynamically each run)
+Load all Loki connection details from `.env.active` (set by switch-env scripts).
+Never hardcode credentials.
 
-On Windows, load credentials via PowerShell:
+On Windows, load via PowerShell:
 ```powershell
 $env_vars = @{}
-Get-Content ".env" | Where-Object { $_ -match "^[^#].+=.+" } | ForEach-Object {
+Get-Content ".env.active" | Where-Object { $_ -match "^[^#].+=.+" } | ForEach-Object {
     $parts = $_ -split "=", 2
     $env_vars[$parts[0].Trim()] = $parts[1].Trim()
 }
-$LOKI_PASSWORD = $env_vars["LOKI_PASSWORD"]
-$LOKI_USERNAME = "1494446"
+$LOKI_URL      = $env_vars["LOKI_URL"]       # e.g. https://logs-prod-025.grafana.net
+$LOKI_USERNAME = $env_vars["LOKI_USERNAME"]  # e.g. 1494446
+$LOKI_PASSWORD = $env_vars["LOKI_PASSWORD"]  # Grafana API token (never committed)
+$LOKI_QUERY_FILTER = $env_vars["LOKI_QUERY_FILTER"]
+# local:  {job="docker-compose"}
+# aks:    {namespace="perf-demo"}
 ```
 
 Disable certificate revocation check (required on Windows):
@@ -90,13 +91,18 @@ $endNs   = ([DateTimeOffset]::Parse($end_time)).ToUnixTimeMilliseconds() * 10000
 
 ### Queries to Run
 
-Run all three queries against `/loki/api/v1/query_range`:
+Run all three queries against `$LOKI_URL/loki/api/v1/query_range`.
+Use `$LOKI_QUERY_FILTER` as the base selector (read from `.env.active`):
 
 | Query # | LogQL | Purpose |
 |---|---|---|
-| 1 | `{job="docker-compose"} \|= "error"` | Application errors |
-| 2 | `{job="docker-compose"} \|= "warn"` | Warnings |
-| 3 | `{job="docker-compose"} \|= "exception"` | Exceptions |
+| 1 | `$LOKI_QUERY_FILTER \|= "error"` | Application errors |
+| 2 | `$LOKI_QUERY_FILTER \|= "warn"` | Warnings |
+| 3 | `$LOKI_QUERY_FILTER \|= "exception"` | Exceptions |
+
+**Examples by environment:**
+- Local Docker: `{job="docker-compose"} |= "error"`
+- AKS: `{namespace="perf-demo"} |= "error"`
 
 Parameters: `limit=200`, `direction=backward`
 
@@ -196,7 +202,7 @@ Print to user:
 
 - Never modify threshold definitions — only evaluate what you receive
 - Always query Loki for the **exact test window** from start_time to end_time
-- Always load the Loki password from `.env` — never hardcode credentials
+- Always load Loki credentials and query filter from `.env.active` — never hardcode credentials
 - If log_summary cannot be obtained, still produce a verdict based on metrics alone
   and note "Loki data unavailable" in the ticket
 - Do not create Jira tickets — that is the Reporting Agent's responsibility

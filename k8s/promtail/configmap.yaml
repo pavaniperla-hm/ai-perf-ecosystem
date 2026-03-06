@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: perf-demo
+data:
+  config.yml: |
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+
+    positions:
+      filename: /run/promtail/positions.yaml
+
+    clients:
+      - url: ${LOKI_URL}/loki/api/v1/push
+        basic_auth:
+          username: ${LOKI_USERNAME}
+          password: ${GRAFANA_API_TOKEN}
+
+    scrape_configs:
+
+      # ── Kubernetes pod log discovery ───────────────────────────────────────────
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [perf-demo]
+
+        pipeline_stages:
+          # Attempt to parse JSON log lines (FastAPI / Express emit JSON)
+          - json:
+              expressions:
+                level: level
+                msg: msg
+                message: message
+          # Promote parsed level to a Loki label
+          - labels:
+              level:
+
+        relabel_configs:
+          # Use the app label as the service name
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+
+          # Add namespace label
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+
+          # Add pod name
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+
+          # Add container name
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container
+
+          # Static environment label
+          - target_label: environment
+            replacement: aks
+
+          # Static job label for querying
+          - target_label: job
+            replacement: kubernetes-pods
+
+          # Required: tell promtail where to find the log file on the node.
+          # Source labels join as "<uid>/<container>"; regex splits them into $1/$2.
+          # Kubernetes log path: /var/log/pods/<ns>_<pod>_<uid>/<container>/<n>.log
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            action: replace
+            separator: /
+            regex: (.+)/(.+)
+            target_label: __path__
+            replacement: /var/log/pods/*$1*/$2/*.log
