@@ -68,16 +68,32 @@ IF verdict == "FAIL":
 
 ---
 
-## Jira Ticket (verdict == FAIL)
+## Ticket Creation (verdict == FAIL)
 
-### Project and Fields
+Read the active environment from `.env.active` to determine which tracker to use:
+
+```
+ENVIRONMENT=local  → create Jira ticket  (JIRA_WORK_ITEM_TYPE from .env.active, default: Bug)
+ENVIRONMENT=aks    → create Azure DevOps work item  (AZURE_DEVOPS_WORK_ITEM_TYPE from .env.active, default: Issue)
+```
+
+### Jira Fields (local environment)
 
 | Field | Value |
 |---|---|
 | Project key | `SCRUM` |
-| Issue type | `Bug` |
+| Issue type | read `JIRA_WORK_ITEM_TYPE` from `.env.active` (default: `Bug`) |
 | Priority | `High` |
 | Labels | `performance-regression`, `automated`, `<scenario-slug>` |
+
+### Azure DevOps Fields (AKS environment)
+
+| Field | Value |
+|---|---|
+| Project | `ai-perf-project` |
+| Work item type | read `AZURE_DEVOPS_WORK_ITEM_TYPE` from `.env.active` (default: `Issue`) |
+| Priority | `1` (High) |
+| Tags | `performance-regression; automated; <scenario-slug>` |
 
 Where `<scenario-slug>` = scenario name lowercased, spaces → hyphens.
 
@@ -145,10 +161,10 @@ Use **exactly** this structure. Fill every section with real values from the inp
 ## Log Evidence (from Loki)
 
 **Query window:** <start_time> → <end_time>
-**LogQL queries used:**
-- `{job="docker-compose"} |= "error"`
-- `{job="docker-compose"} |= "warn"`
-- `{job="docker-compose"} |= "exception"`
+**LogQL queries used** (filter from `LOKI_QUERY_FILTER` in `.env.active`):
+- `<LOKI_QUERY_FILTER> |= "error"`
+- `<LOKI_QUERY_FILTER> |= "warn"`
+- `<LOKI_QUERY_FILTER> |= "exception"`
 
 | Category | Count |
 |---|---|
@@ -179,14 +195,14 @@ Use **exactly** this structure. Fill every section with real values from the inp
 *Created automatically by Claude Code — AI Performance Engineering Ecosystem*
 ```
 
-### Jira Tool Call
+### Tool Call — Jira (local environment)
 
 Use `mcp__mcp-atlassian__jira_create_issue` with:
 ```json
 {
   "project_key": "SCRUM",
   "summary": "<constructed summary>",
-  "issue_type": "Bug",
+  "issue_type": "<JIRA_WORK_ITEM_TYPE from .env.active>",
   "description": "<full markdown description above>",
   "additional_fields": {
     "priority": { "name": "High" },
@@ -195,21 +211,51 @@ Use `mcp__mcp-atlassian__jira_create_issue` with:
 }
 ```
 
+### Tool Call — Azure DevOps (AKS environment)
+
+Use the Azure DevOps REST API (array parameters are not supported via MCP tool):
+```bash
+PAT=$(grep "^AZURE_DEVOPS_PAT=" ~/.claude.json | ...)   # or from env
+WORK_ITEM_TYPE=$(grep "^AZURE_DEVOPS_WORK_ITEM_TYPE=" .env.active | cut -d'=' -f2-)
+B64=$(echo -n ":${PAT}" | base64 -w0)
+curl -s --ssl-no-revoke \
+  -X POST \
+  "https://dev.azure.com/ai-perf-demo/ai-perf-project/_apis/wit/workitems/\$${WORK_ITEM_TYPE}?api-version=7.1" \
+  -H "Authorization: Basic ${B64}" \
+  -H "Content-Type: application/json-patch+json" \
+  -d "[
+    {\"op\":\"add\",\"path\":\"/fields/System.Title\",\"value\":\"<summary>\"},
+    {\"op\":\"add\",\"path\":\"/fields/System.Description\",\"value\":\"<html description>\"},
+    {\"op\":\"add\",\"path\":\"/fields/Microsoft.VSTS.Common.Priority\",\"value\":1},
+    {\"op\":\"add\",\"path\":\"/fields/System.Tags\",\"value\":\"performance-regression; automated; <scenario-slug>\"}
+  ]"
+```
+
+The PAT is stored in `~/.claude.json` under `mcpServers.azure-devops.env.ADO_MCP_AUTH_TOKEN`.
+
 ---
 
 ## Outputs
 
-On **FAIL** (ticket created):
+On **FAIL** — Jira (local):
 ```
 [REPORTING AGENT] Jira ticket created ✅
   Key : SCRUM-<N>
   URL : https://pavani-perf-demo.atlassian.net/browse/SCRUM-<N>
 ```
 
+On **FAIL** — Azure DevOps (AKS):
+```
+[REPORTING AGENT] Azure DevOps work item created ✅
+  ID  : <N>
+  URL : https://dev.azure.com/ai-perf-demo/ai-perf-project/_workitems/edit/<N>
+```
+
 Return:
 ```
-ticket_key: "SCRUM-<N>"
-ticket_url: "https://pavani-perf-demo.atlassian.net/browse/SCRUM-<N>"
+ticket_key: "SCRUM-<N>"          # Jira
+ticket_key: "ADO-<N>"            # Azure DevOps (work item ID)
+ticket_url: "<url to ticket>"
 ```
 
 On **PASS** (no ticket):
@@ -230,7 +276,10 @@ reason: "Jira ticket creation failed: <error message>"
 
 - Never create a ticket when verdict is PASS
 - Never create more than one ticket per pipeline run
-- Always use the `SCRUM` project key — do not guess or hardcode another key
+- Always read `ENVIRONMENT` from `.env.active` to choose Jira vs Azure DevOps
+- For Jira: always use `SCRUM` project key; read issue type from `JIRA_WORK_ITEM_TYPE`
+- For Azure DevOps: use `ai-perf-project`; read work item type from `AZURE_DEVOPS_WORK_ITEM_TYPE`
+- Azure DevOps work items must be created via REST API (not MCP wit_create_work_item — array params broken)
 - Always include all four sections (Threshold Analysis, Full Metrics,
   Per-Transaction, Log Evidence) even if some values are zero
 - If `log_summary` contains `error: "Loki data unavailable"`, write
