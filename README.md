@@ -435,3 +435,75 @@ Demo/
 - Use `?skip=` and `?limit=` to test pagination under load.
 - The order-service database has indexes on `user_id`, `product_id`, and `status` — test filtered queries for realistic workloads.
 - Run `docker compose down -v && docker compose up --build` for a clean re-seed between test runs.
+
+---
+
+## Switching Environments
+
+This project supports two target environments: **local Docker** and **AKS (Azure cloud)**.
+A single switch command updates `.env` and `.env.active` with all environment-specific values.
+
+### Switch to AKS (Azure cloud)
+
+**PowerShell:**
+```powershell
+.\scripts\switch-env.ps1 -env aks
+```
+
+**Bash / WSL2:**
+```bash
+./scripts/switch-env.sh aks
+```
+
+### Switch to local Docker
+
+**PowerShell:**
+```powershell
+.\scripts\switch-env.ps1 -env local
+```
+
+**Bash / WSL2:**
+```bash
+./scripts/switch-env.sh local
+```
+
+### What the switch does
+
+| File | Updated to |
+|---|---|
+| `.env` | Copy of `.env.local` or `.env.aks` |
+| `.env.active` | Same copy — used by agents and scripts to detect active env |
+
+### Requirements per environment
+
+| Environment | Requirement |
+|---|---|
+| `local` | `docker compose up -d` |
+| `aks` | AKS cluster running + `kubectl get pods -n perf-demo` healthy |
+
+### Running k6 after switching (Bash)
+
+```bash
+# Load the active environment
+set -a && source <(tr -d '\r' < .env) && set +a
+
+# Run with Grafana output — K6_BASE_URL is set automatically from .env
+k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
+```
+
+### AKS — start port-forwards for MCP database access
+
+```bash
+kubectl port-forward -n perf-demo svc/user-db 15433:5432 &
+kubectl port-forward -n perf-demo svc/product-db 15434:5432 &
+kubectl port-forward -n perf-demo svc/order-db 15435:5432 &
+```
+
+### Environment files
+
+| File | Purpose |
+|---|---|
+| `.env.local` | Local Docker settings (committed, no secrets) |
+| `.env.aks` | AKS cloud settings (committed, no secrets) |
+| `.env` | Active environment (gitignored — contains secrets) |
+| `.env.active` | Active environment marker (gitignored) |

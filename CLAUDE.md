@@ -405,3 +405,54 @@ TARGET_ENV=local k6 run --out experimental-prometheus-rw k6/scripts/baseline-tes
 | **Overall** | **41.62ms** | **49ms** | **52ms** | **<1500ms ✅** |
 
 Load: 10 VUs · 5 min · 590 iterations · 2,360 requests · 7.74 req/s · 0% errors
+
+## Environment Switching
+
+The project supports two target environments. Always check which is active before querying databases or running tests.
+
+### Detecting the active environment
+
+Read `.env.active` (created by the switch script):
+
+```bash
+grep "^ENVIRONMENT=" .env.active 2>/dev/null || echo "No .env.active — defaulting to local"
+```
+
+| `ENVIRONMENT` | k6 target | MCP servers | DB ports |
+|---|---|---|---|
+| `local` | `http://localhost:80` | `user-db`, `product-db`, `order-db` | 5433 / 5434 / 5435 |
+| `aks` | `http://20.82.174.115` | `user-db-aks`, `product-db-aks`, `order-db-aks` | 15433 / 15434 / 15435 |
+
+### Switching environments
+
+```powershell
+# PowerShell
+.\scripts\switch-env.ps1 -env aks
+.\scripts\switch-env.ps1 -env local
+```
+
+```bash
+# Bash / WSL2
+./scripts/switch-env.sh aks
+./scripts/switch-env.sh local
+```
+
+### Running k6 after switching (always source .env first)
+
+```bash
+set -a && source <(tr -d '\r' < .env) && set +a
+k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
+```
+
+### Environment files
+
+| File | Description |
+|---|---|
+| `.env.local` | Local Docker config — committed, no secrets |
+| `.env.aks` | AKS cloud config — committed, no secrets |
+| `.env` | Active env + secrets (gitignored) |
+| `.env.active` | Active env marker, no secrets (gitignored) |
+
+**Secrets** (`K6_PROMETHEUS_RW_PASSWORD`, `LOKI_PASSWORD`) are never committed.
+After switching environments, paste the token into `.env` manually.
+
