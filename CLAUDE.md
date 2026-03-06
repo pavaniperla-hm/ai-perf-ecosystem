@@ -437,10 +437,23 @@ grep "^ENVIRONMENT=" .env.active 2>/dev/null || echo "No .env.active — default
 ./scripts/switch-env.sh local
 ```
 
-### Running k6 after switching (always source .env first)
+### Running k6 after switching
+
+> **IMPORTANT — always regenerate the CSV after switching environments.**
+> The CSV contains emails and IDs from a specific database. After switching
+> from local→AKS or AKS→local the emails won't match and login checks will fail.
 
 ```bash
+# 1. Switch environment
+./scripts/switch-env.sh aks          # or: local
+
+# 2. Regenerate CSV from the active environment's databases
+node k6/scripts/generate-test-data.js aks   # or: local
+
+# 3. Load env vars (including Grafana token — paste into .env first)
 set -a && source <(tr -d '\r' < .env) && set +a
+
+# 4. Run test
 k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
 ```
 
