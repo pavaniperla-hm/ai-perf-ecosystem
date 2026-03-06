@@ -207,3 +207,117 @@ Close the loop with automated analysis.
 
 ### Test Data
 - [x] `test-data/test-data-checkout.csv` — 500 customers with recent orders, joined across all 3 databases, ready for k6 parameterisation
+
+### Kubernetes (AKS) Deployment
+- [x] Full AKS deployment — cluster `aks-perf-demo`, namespace `perf-demo`, region `northeurope`
+- [x] All services running: user-service, product-service, order-service, frontend + 3 PostgreSQL DBs
+- [x] Nginx ingress controller — single public IP `20.82.174.115` for all routes
+- [x] Frontend live at `http://20.82.174.115`
+
+---
+
+## AKS Deployment
+
+### Cluster Details
+| Property | Value |
+|---|---|
+| Cluster | `aks-perf-demo` |
+| Resource Group | `rg-perf-demo` |
+| Region | `northeurope` |
+| Namespace | `perf-demo` |
+| Node Architecture | **ARM64** (Ampere-based VM SKU) |
+| ACR | `pavaniperfdemo.azurecr.io` |
+
+### Live URLs
+| Route | Service |
+|---|---|
+| `http://20.82.174.115` | React SPA (frontend) |
+| `http://20.82.174.115/api/users` | User service |
+| `http://20.82.174.115/api/products` | Product service |
+| `http://20.82.174.115/api/orders` | Order service |
+
+### k8s Directory Structure
+```
+k8s/
+├── namespace.yaml
+├── secrets.yaml                  # db-secrets with PostgreSQL connection URLs
+├── postgres/
+│   ├── user-db.yaml              # PVC + Deployment + ClusterIP Service
+│   ├── product-db.yaml
+│   └── order-db.yaml
+├── user-service/
+│   ├── deployment.yaml
+│   └── service.yaml              # ClusterIP (ingress handles external access)
+├── product-service/
+│   ├── deployment.yaml
+│   └── service.yaml
+├── order-service/
+│   ├── deployment.yaml
+│   └── service.yaml
+├── frontend/
+│   ├── deployment.yaml
+│   └── service.yaml
+├── ingress/
+│   └── ingress.yaml              # Nginx ingress — 4 separate Ingress objects
+├── deploy.sh                     # Full deploy script with rollout waits
+└── build-and-push.sh             # Build & push all images (ARM64)
+```
+
+### Deploying to AKS
+
+**Step 1 — Build and push images (from WSL2, must be ARM64):**
+```bash
+./k8s/build-and-push.sh
+```
+
+**Step 2 — Deploy:**
+```bash
+az aks get-credentials --resource-group rg-perf-demo --name aks-perf-demo
+./k8s/deploy.sh
+```
+
+**Nginx ingress controller** (installed once, not in deploy.sh):
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/cloud/deploy.yaml
+```
+
+### Critical Lessons Learned
+
+**1. AKS node pool is ARM64**
+The VM SKU is Ampere/ARM-based. All images MUST be built for `linux/arm64`.
+Always use: `--platform linux/arm64`
+
+**2. Build images from WSL2, not Windows PowerShell**
+Docker Desktop on Windows creates OCI manifest indexes that AKS containerd cannot parse.
+Build from WSL2 with `--provenance=false` to get a clean single-arch manifest:
+```bash
+docker build --platform linux/arm64 --no-cache --provenance=false \
+  -t pavaniperfdemo.azurecr.io/<service>:latest ./<service>
+```
+
+**3. ACR must be attached to AKS**
+Run once after cluster creation:
+```bash
+az aks update --name aks-perf-demo --resource-group rg-perf-demo --attach-acr pavaniperfdemo
+```
+
+**4. PostgreSQL PGDATA on Azure Disk PVCs**
+Azure Disk PVCs have a `lost+found` directory at the mount root. PostgreSQL `initdb`
+fails if `PGDATA` points directly at the mount. All postgres deployments set:
+```yaml
+- name: PGDATA
+  value: /var/lib/postgresql/data/pgdata
+```
+
+**5. Windows CRLF in shell scripts**
+Git on Windows converts LF→CRLF on checkout. Shell scripts baked into Docker images
+get `exec format error` on Linux. Fixed by:
+- `.gitattributes` enforcing `eol=lf` for all `.sh`, `.py`, `Dockerfile` files
+- Inlining CMD in Dockerfiles instead of calling `start.sh`
+
+**6. Azure public IP quota**
+Free/trial subscriptions have a limit on public IPs. Use a single Nginx ingress
+controller instead of `LoadBalancer` type per service. All services use `ClusterIP`.
+
+**7. ACR Tasks not available on Basic tier**
+`az acr build` requires Standard or Premium ACR tier. Use WSL2 builds instead.
