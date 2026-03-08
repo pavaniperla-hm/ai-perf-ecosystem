@@ -14,14 +14,14 @@ const env = process.argv[2] || 'aks';
 
 const config = {
   local: {
-    user:    { host: 'localhost', port: 5433, database: 'userdb',    user: 'postgres', password: 'postgres' },
-    product: { host: 'localhost', port: 5434, database: 'productdb', user: 'postgres', password: 'postgres' },
-    order:   { host: 'localhost', port: 5435, database: 'orderdb',   user: 'postgres', password: 'postgres' },
+    user:    { host: '127.0.0.1', port: 5433, database: 'userdb',    user: 'postgres', password: 'postgres' },
+    product: { host: '127.0.0.1', port: 5434, database: 'productdb', user: 'postgres', password: 'postgres' },
+    order:   { host: '127.0.0.1', port: 5435, database: 'orderdb',   user: 'postgres', password: 'postgres' },
   },
   aks: {
-    user:    { host: 'localhost', port: 15433, database: 'userdb',    user: 'postgres', password: 'postgres' },
-    product: { host: 'localhost', port: 15434, database: 'productdb', user: 'postgres', password: 'postgres' },
-    order:   { host: 'localhost', port: 15435, database: 'orderdb',   user: 'postgres', password: 'postgres' },
+    user:    { host: '127.0.0.1', port: 15433, database: 'userdb',    user: 'postgres', password: 'postgres' },
+    product: { host: '127.0.0.1', port: 15434, database: 'productdb', user: 'postgres', password: 'postgres' },
+    order:   { host: '127.0.0.1', port: 15435, database: 'orderdb',   user: 'postgres', password: 'postgres' },
   },
 };
 

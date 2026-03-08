@@ -36,20 +36,21 @@ const customers = new SharedArray('customers', () =>
 );
 
 // ── Options ───────────────────────────────────────────────────────────────────
-// Baseline: steady 10 VUs for 5 minutes — establishes normal performance baseline.
-// Thresholds are strict because load is minimal; any slowness here is real overhead.
+// Baseline: steady 10 VUs for 2 minutes — tight thresholds to simulate regression.
+// p(95)<20ms will breach on any real network hop; used to test FAIL pipeline path.
 export const options = {
   vus:      10,
-  duration: '5m',
+  duration: '2m',
 
   thresholds: {
-    http_req_duration:       ['p(95)<1500'],   // tighter than peak/stress
-    errors:                  ['rate<0.01'],    // near-zero errors expected at baseline
+    http_req_duration:       ['p(95)<20'],    // tight — will breach on real latency
+    errors:                  ['rate==0'],      // zero errors required
+    checks:                  ['rate==1.0'],    // 100% checks required
 
-    txn_login_page:          ['p(95)<1500'],
-    txn_products_page:       ['p(95)<1500'],
-    txn_product_detail_page: ['p(95)<1500'],
-    txn_checkout_page:       ['p(95)<1500'],
+    txn_login_page:          ['p(95)<20'],
+    txn_products_page:       ['p(95)<20'],
+    txn_product_detail_page: ['p(95)<20'],
+    txn_checkout_page:       ['p(95)<20'],
   },
 
   // Tags are attached to every metric sent to Grafana — use them to filter
@@ -174,7 +175,7 @@ function buildReport(data) {
     return { label, v: m ? m.values : {} };
   });
 
-  const statusBadge = (p95, threshold = 1500) =>
+  const statusBadge = (p95, threshold = 20) =>
     p95 < threshold
       ? `<span class="badge pass">PASSED</span>`
       : `<span class="badge fail">FAILED</span>`;
@@ -262,7 +263,7 @@ function buildReport(data) {
   <div class="header">
     <div class="scenario-badge">BASELINE</div>
     <h1>Baseline Load Test — Performance Report</h1>
-    <p>10 Virtual Users &nbsp;·&nbsp; 5 minutes &nbsp;·&nbsp; Threshold: p(95) &lt; 1500 ms &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
+    <p>10 Virtual Users &nbsp;·&nbsp; 2 minutes &nbsp;·&nbsp; Threshold: p(95) &lt; 20 ms &nbsp;·&nbsp; Generated ${new Date().toUTCString()}</p>
   </div>
   <div class="content">
 
@@ -287,7 +288,7 @@ function buildReport(data) {
         <div class="kpi">
           <div class="kpi-label">Error Rate</div>
           <div class="kpi-value">${errRate}%</div>
-          <div class="kpi-sub">Threshold &lt; 1%</div>
+          <div class="kpi-sub">Threshold = 0%</div>
         </div>
       </div>
     </div>

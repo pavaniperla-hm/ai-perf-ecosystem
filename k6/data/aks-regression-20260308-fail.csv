@@ -1,0 +1,51 @@
+customer_id,customer_email,customer_name,customer_joined,order_id,order_date,order_status,product_id,product_name,product_category,quantity,unit_price,total_price
+4,mooreemily@example.net,Elijah Hoover,2024-01-01,52376,2026-03-08T13:28:50.012Z,pending,3644,Rustic Wooden Cheese,Sports,2,305.90,611.80
+3,michaelmiller@example.org,Steve Miller,2024-01-01,52375,2026-03-08T13:28:50.011Z,pending,822,Luxurious Concrete Towels,Clothing,8,106.38,851.04
+11,paula94@example.net,Mark Beard,2024-01-01,52373,2026-03-08T13:28:49.590Z,pending,4342,Awesome Plastic Sausages,Books,6,761.05,4566.30
+6,jonathan56@example.net,Sarah Porter,2024-01-01,52374,2026-03-08T13:28:49.590Z,pending,842,Gorgeous Rubber Computer,Clothing,3,199.26,597.78
+7,cherylschmidt@example.net,Patricia Preston,2024-01-01,52372,2026-03-08T13:28:49.589Z,pending,3862,Bespoke Plastic Cheese,Beauty & Health,5,424.33,2121.65
+5,bclark@example.net,Jared Gardner,2024-01-01,52371,2026-03-08T13:28:49.585Z,pending,4491,Unbranded Rubber Bike,Electronics,4,92.02,368.08
+8,pjenkins@example.net,Thomas Murray,2024-01-01,52370,2026-03-08T13:28:49.485Z,pending,4399,Gorgeous Metal Gloves,Beauty & Health,9,708.01,6372.09
+2,vmiller@example.org,Erin Flores,2024-01-01,52369,2026-03-08T13:28:49.485Z,pending,2800,Sleek Soft Bike,Beauty & Health,7,17.41,121.87
+9,patty33@example.net,James Hill,2024-01-01,52368,2026-03-08T13:28:49.279Z,pending,1520,Handmade Concrete Chips,Electronics,5,86.63,433.15
+10,lanedeanna@example.net,Vanessa Davis,2024-01-01,52367,2026-03-08T13:28:49.279Z,pending,217,Ergonomic Bronze Towels,Sports,6,418.64,2511.84
+3,michaelmiller@example.org,Steve Miller,2024-01-01,52366,2026-03-08T13:28:44.755Z,pending,822,Luxurious Concrete Towels,Clothing,8,106.38,851.04
+4,mooreemily@example.net,Elijah Hoover,2024-01-01,52365,2026-03-08T13:28:44.590Z,pending,3644,Rustic Wooden Cheese,Sports,2,305.90,611.80
+7,cherylschmidt@example.net,Patricia Preston,2024-01-01,52364,2026-03-08T13:28:44.322Z,pending,3862,Bespoke Plastic Cheese,Beauty & Health,5,424.33,2121.65
+6,jonathan56@example.net,Sarah Porter,2024-01-01,52363,2026-03-08T13:28:44.318Z,pending,842,Gorgeous Rubber Computer,Clothing,3,199.26,597.78
+5,bclark@example.net,Jared Gardner,2024-01-01,52362,2026-03-08T13:28:44.304Z,pending,4491,Unbranded Rubber Bike,Electronics,4,92.02,368.08
+11,paula94@example.net,Mark Beard,2024-01-01,52361,2026-03-08T13:28:44.301Z,pending,4342,Awesome Plastic Sausages,Books,6,761.05,4566.30
+8,pjenkins@example.net,Thomas Murray,2024-01-01,52360,2026-03-08T13:28:44.277Z,pending,4399,Gorgeous Metal Gloves,Beauty & Health,9,708.01,6372.09
+2,vmiller@example.org,Erin Flores,2024-01-01,52359,2026-03-08T13:28:44.273Z,pending,2800,Sleek Soft Bike,Beauty & Health,7,17.41,121.87
+9,patty33@example.net,James Hill,2024-01-01,52358,2026-03-08T13:28:43.775Z,pending,1520,Handmade Concrete Chips,Electronics,5,86.63,433.15
+10,lanedeanna@example.net,Vanessa Davis,2024-01-01,52357,2026-03-08T13:28:43.740Z,pending,217,Ergonomic Bronze Towels,Sports,6,418.64,2511.84
+3,michaelmiller@example.org,Steve Miller,2024-01-01,52356,2026-03-08T13:28:39.557Z,pending,822,Luxurious Concrete Towels,Clothing,8,106.38,851.04
+4,mooreemily@example.net,Elijah Hoover,2024-01-01,52355,2026-03-08T13:28:39.388Z,pending,3644,Rustic Wooden Cheese,Sports,2,305.90,611.80
+7,cherylschmidt@example.net,Patricia Preston,2024-01-01,52354,2026-03-08T13:28:39.133Z,pending,3862,Bespoke Plastic Cheese,Beauty & Health,5,424.33,2121.65
+6,jonathan56@example.net,Sarah Porter,2024-01-01,52353,2026-03-08T13:28:39.128Z,pending,842,Gorgeous Rubber Computer,Clothing,3,199.26,597.78
+5,bclark@example.net,Jared Gardner,2024-01-01,52352,2026-03-08T13:28:39.122Z,pending,4491,Unbranded Rubber Bike,Electronics,4,92.02,368.08
+11,paula94@example.net,Mark Beard,2024-01-01,52351,2026-03-08T13:28:39.120Z,pending,4342,Awesome Plastic Sausages,Books,6,761.05,4566.30
+8,pjenkins@example.net,Thomas Murray,2024-01-01,52350,2026-03-08T13:28:39.092Z,pending,4399,Gorgeous Metal Gloves,Beauty & Health,9,708.01,6372.09
+2,vmiller@example.org,Erin Flores,2024-01-01,52349,2026-03-08T13:28:39.079Z,pending,2800,Sleek Soft Bike,Beauty & Health,7,17.41,121.87
+9,patty33@example.net,James Hill,2024-01-01,52348,2026-03-08T13:28:38.588Z,pending,1520,Handmade Concrete Chips,Electronics,5,86.63,433.15
+10,lanedeanna@example.net,Vanessa Davis,2024-01-01,52347,2026-03-08T13:28:38.553Z,pending,217,Ergonomic Bronze Towels,Sports,6,418.64,2511.84
+3,michaelmiller@example.org,Steve Miller,2024-01-01,52346,2026-03-08T13:28:34.278Z,pending,822,Luxurious Concrete Towels,Clothing,8,106.38,851.04
+4,mooreemily@example.net,Elijah Hoover,2024-01-01,52345,2026-03-08T13:28:34.187Z,pending,3644,Rustic Wooden Cheese,Sports,2,305.90,611.80
+7,cherylschmidt@example.net,Patricia Preston,2024-01-01,52344,2026-03-08T13:28:33.924Z,pending,3862,Bespoke Plastic Cheese,Beauty & Health,5,424.33,2121.65
+11,paula94@example.net,Mark Beard,2024-01-01,52343,2026-03-08T13:28:33.924Z,pending,4342,Awesome Plastic Sausages,Books,6,761.05,4566.30
+5,bclark@example.net,Jared Gardner,2024-01-01,52342,2026-03-08T13:28:33.923Z,pending,4491,Unbranded Rubber Bike,Electronics,4,92.02,368.08
+6,jonathan56@example.net,Sarah Porter,2024-01-01,52341,2026-03-08T13:28:33.922Z,pending,842,Gorgeous Rubber Computer,Clothing,3,199.26,597.78
+2,vmiller@example.org,Erin Flores,2024-01-01,52340,2026-03-08T13:28:33.893Z,pending,2800,Sleek Soft Bike,Beauty & Health,7,17.41,121.87
+8,pjenkins@example.net,Thomas Murray,2024-01-01,52339,2026-03-08T13:28:33.893Z,pending,4399,Gorgeous Metal Gloves,Beauty & Health,9,708.01,6372.09
+9,patty33@example.net,James Hill,2024-01-01,52338,2026-03-08T13:28:33.398Z,pending,1520,Handmade Concrete Chips,Electronics,5,86.63,433.15
+10,lanedeanna@example.net,Vanessa Davis,2024-01-01,52337,2026-03-08T13:28:33.386Z,pending,217,Ergonomic Bronze Towels,Sports,6,418.64,2511.84
+3,michaelmiller@example.org,Steve Miller,2024-01-01,52336,2026-03-08T13:28:29.021Z,pending,822,Luxurious Concrete Towels,Clothing,8,106.38,851.04
+4,mooreemily@example.net,Elijah Hoover,2024-01-01,52335,2026-03-08T13:28:29.006Z,pending,3644,Rustic Wooden Cheese,Sports,2,305.90,611.80
+7,cherylschmidt@example.net,Patricia Preston,2024-01-01,52334,2026-03-08T13:28:28.726Z,pending,3862,Bespoke Plastic Cheese,Beauty & Health,5,424.33,2121.65
+6,jonathan56@example.net,Sarah Porter,2024-01-01,52332,2026-03-08T13:28:28.725Z,pending,842,Gorgeous Rubber Computer,Clothing,3,199.26,597.78
+5,bclark@example.net,Jared Gardner,2024-01-01,52331,2026-03-08T13:28:28.724Z,pending,4491,Unbranded Rubber Bike,Electronics,4,92.02,368.08
+11,paula94@example.net,Mark Beard,2024-01-01,52333,2026-03-08T13:28:28.724Z,pending,4342,Awesome Plastic Sausages,Books,6,761.05,4566.30
+2,vmiller@example.org,Erin Flores,2024-01-01,52329,2026-03-08T13:28:28.704Z,pending,2800,Sleek Soft Bike,Beauty & Health,7,17.41,121.87
+8,pjenkins@example.net,Thomas Murray,2024-01-01,52330,2026-03-08T13:28:28.704Z,pending,4399,Gorgeous Metal Gloves,Beauty & Health,9,708.01,6372.09
+9,patty33@example.net,James Hill,2024-01-01,52328,2026-03-08T13:28:28.075Z,pending,1520,Handmade Concrete Chips,Electronics,5,86.63,433.15
+10,lanedeanna@example.net,Vanessa Davis,2024-01-01,52327,2026-03-08T13:28:27.945Z,pending,217,Ergonomic Bronze Towels,Sports,6,418.64,2511.84
