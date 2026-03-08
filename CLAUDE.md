@@ -1,509 +1,110 @@
 # CLAUDE.md — AI Performance Engineering Ecosystem
 
-This file gives Claude Code full context about the project, goals, and current state.
+This file gives Claude Code full context so any new session can pick up exactly where the previous one left off.
 
 ---
 
 ## Project Overview
 
-**AI Performance Engineering Ecosystem** is a hands-on learning project that combines a realistic e-commerce microservices application with AI-assisted performance engineering workflows.
+**AI Performance Engineering Ecosystem** is a hands-on demo project that automates the full performance testing lifecycle using AI agents. It runs against a realistic 3-service e-commerce microservices stack deployed in both a local Docker environment and Azure Kubernetes Service (AKS).
 
-The goal is to use Claude Code (with MCP database connections, k6, and Playwright) to automate the full performance testing lifecycle: data extraction, script generation, test execution, results analysis, and reporting — with minimal manual effort.
+The pipeline is driven by five specialised Claude Code agents:
+- **Orchestrator** — coordinates the full pipeline, routes to the correct bug tracker based on environment
+- **Health Check Agent** — pre-flight validation of services, pods, and DB connections before any test runs
+- **Data Agent** — queries live PostgreSQL DBs via MCP and generates parameterised k6 CSV test data
+- **Execution Agent** — runs k6 load tests and captures results
+- **Analysis Agent** — interprets results, queries Loki for error logs, raises bugs in Jira (local) or Azure DevOps (AKS)
+
+**Dual environments:**
+| Environment | Target | Bug Tracker |
+|---|---|---|
+| `local` | `http://localhost:8080` | Jira (`SCRUM` project) |
+| `aks` | `http://20.82.174.115` | Azure DevOps |
+
+**Observability:** Grafana Cloud (Prometheus remote write + Loki log shipping). Dynatrace integration pending.
 
 ---
 
 ## Architecture
 
 ```
-  Browser / k6
-       │
-       ▼
-  ┌─────────────────────────────────┐
-  │      Nginx API Gateway  :80     │
-  │  /api/users     → :8001         │
-  │  /api/products  → :8002         │
-  │  /api/orders    → :8003         │
-  └────────┬──────────┬─────────────┘
-           │          │         │
-           ▼          ▼         ▼
-  ┌──────────────┐ ┌──────────┐ ┌──────────────┐
-  │ User Service │ │ Product  │ │ Order Service│
-  │ Python/FastAPI│ │ Node/    │ │ Python/FastAPI│
-  │    :8001     │ │ Express  │ │    :8003     │
-  └──────┬───────┘ │  :8002   │ └──────┬───────┘
-         │         └────┬─────┘        │
-         ▼              ▼              ▼
-    ┌─────────┐   ┌──────────┐   ┌──────────┐
-    │ user-db │   │product-db│   │ order-db │
-    │ :5433   │   │  :5434   │   │  :5435   │
-    │ 10K rows│   │ 5K rows  │   │ 50K rows │
-    └─────────┘   └──────────┘   └──────────┘
-
-  React SPA (frontend) served at :3000
+  ┌───────────────────────────────────────────────────────┐
+  │                   Claude Code Agents                  │
+  │  Orchestrator → HealthCheck → Data → Execution → Analysis
+  └───────────────────────────────────────────────────────┘
+                            │
+               ┌────────────┴────────────┐
+               │                         │
+         Local Docker               AKS (northeurope)
+         localhost:8080           http://20.82.174.115
+               │                         │
+       ┌───────┴──────┐         ┌────────┴──────┐
+       │  Nginx :8080 │         │  Nginx Ingress│
+       └──┬──────┬────┘         └──┬──────┬─────┘
+          │      │                 │      │
+   user-svc  product-svc     user-svc  product-svc
+   order-svc                order-svc
+          │                         │
+   ┌──────┴──────┐         ┌────────┴──────┐
+   │  3x Postgres│         │  3x Postgres  │
+   │  :5433-5435 │         │  (via PVC)    │
+   └─────────────┘         └───────────────┘
 ```
+
+**Application services:**
+
+| Service | Port (local) | Description |
+|---|---|---|
+| nginx (gateway) | 8080 | Routes /api/* to services |
+| user-service | 8001 | Python FastAPI — users CRUD |
+| product-service | 8002 | Node.js Express — products CRUD |
+| order-service | 8003 | Python FastAPI — orders CRUD |
+| frontend | 3000 | React SPA |
+| user-db | 5433 | PostgreSQL — userdb (10K rows) |
+| product-db | 5434 | PostgreSQL — productdb (5K rows) |
+| order-db | 5435 | PostgreSQL — orderdb (50K rows) |
 
 ---
 
-## Docker Services & Ports
+## Quick Start
 
-| Service | Container Port | Host Port | Description |
-|---|---|---|---|
-| `nginx` | 80 | **80** | API gateway — primary entry point |
-| `frontend` | 80 | **3000** | React SPA (served by Nginx inside container) |
-| `user-service` | 8001 | **8001** | Python FastAPI — users CRUD |
-| `product-service` | 8002 | **8002** | Node.js Express — products CRUD |
-| `order-service` | 8003 | **8003** | Python FastAPI — orders CRUD |
-| `user-db` | 5432 | **5433** | PostgreSQL 15 — `userdb` |
-| `product-db` | 5432 | **5434** | PostgreSQL 15 — `productdb` |
-| `order-db` | 5432 | **5435** | PostgreSQL 15 — `orderdb` |
-
-**Gateway routes:**
-- `GET /api/users`    → user-service:8001
-- `GET /api/products` → product-service:8002
-- `GET /api/orders`   → order-service:8003
-
-**Start the stack:**
-```bash
-docker compose up --build
-```
-
----
-
-## PostgreSQL Databases & MCP Connections
-
-Three separate PostgreSQL databases, each with its own MCP server configured in Claude Code.
-
-| MCP Server | Database | Host | Port | User | Password | DB Name |
-|---|---|---|---|---|---|---|
-| `user-db` | Users | localhost | 5433 | postgres | postgres | userdb |
-| `product-db` | Products | localhost | 5434 | postgres | postgres | productdb |
-| `order-db` | Orders | localhost | 5435 | postgres | postgres | orderdb |
-
-### Schema Summary
-
-**users** (user-db)
-```
-id, name, email, phone, address, city, country, created_at
-```
-
-**products** (product-db)
-```
-id, name, description, price, category, stock, created_at
-```
-
-**orders** (order-db)
-```
-id, user_id, product_id, quantity, unit_price, total_price, status, created_at
-```
-Order statuses: `pending` · `processing` · `shipped` · `delivered` · `cancelled`
-
-### Seed sizes
-- `users`: 10,001 rows
-- `products`: 5,000 rows
-- `orders`: 50,005 rows
-
----
-
-## Test Data
-
-### Location
-```
-test-data/
-└── test-data-checkout.csv    # 500 rows — k6 parameterised checkout test data
-```
-
-### test-data-checkout.csv
-Extracted via MCP cross-database join (user-db + order-db + product-db).
-
-**Columns:**
-`customer_id`, `customer_email`, `customer_name`, `customer_joined`,
-`order_id`, `order_date`, `order_status`,
-`product_id`, `product_name`, `product_category`,
-`quantity`, `unit_price`, `total_price`
-
-**Criteria:** 500 unique customers with at least one order in the last 90 days, joined with their most recent order and product details.
-
-**k6 usage:**
-```js
-import { SharedArray } from 'k6/data';
-const customers = new SharedArray('customers', () =>
-  open('./test-data/test-data-checkout.csv')
-    .split('\n').slice(1).filter(Boolean)
-    .map(line => {
-      const [customer_id, customer_email, customer_name, customer_joined,
-             order_id, order_date, order_status,
-             product_id, product_name, product_category,
-             quantity, unit_price, total_price] = line.split(',');
-      return { customer_id, customer_email, customer_name,
-               product_id, quantity, unit_price };
-    })
-);
-```
-
----
-
-## Goal
-
-Build a fully automated AI-assisted performance engineering pipeline:
-
-1. **Data** — Use Claude Code + MCP to query live databases and generate realistic parameterised test data (no manual SQL or CSV prep)
-2. **Scripts** — Use Claude Code to write and iterate k6 load test scripts and Playwright browser scripts
-3. **Execution** — Run tests against the local Docker stack (and later staging/production)
-4. **Analysis** — Use Claude Code to interpret k6 results, identify bottlenecks, and suggest fixes
-5. **Reporting** — Auto-generate performance reports from test output
-
-**Tools:** k6 (load testing) · Playwright (browser/E2E testing) · Claude Code + MCP (AI assistance) · Docker (target stack)
-
----
-
-## Week by Week Plan
-
-### Week 1 — Foundation
-Set up the target application, MCP connections, and understand the data model.
-- Deploy 3-service e-commerce stack with Docker Compose
-- Connect Claude Code to all three databases via MCP
-- Explore schemas, row counts, and data relationships
-- Generate first test data CSV via AI-assisted cross-database query
-
-### Week 2 — k6 Load Testing
-Build parameterised k6 scripts for the core user journeys.
-- Browse products (GET /api/products)
-- User login / profile lookup (GET /api/users/{id})
-- Checkout flow (POST /api/orders with real customer + product data)
-- Run baseline load tests and capture p95/p99 latencies
-
-### Week 3 — Playwright Browser Testing
-Add browser-level performance testing via the React SPA.
-- Write Playwright scripts for key user journeys
-- Measure Core Web Vitals (LCP, CLS, TBT)
-- Integrate with k6 browser module
-
-### Week 4 — AI-Assisted Analysis & Reporting
-Close the loop with automated analysis.
-- Feed k6 JSON results back to Claude Code for interpretation
-- Identify slow endpoints, error patterns, and database bottlenecks
-- Auto-generate a performance summary report
-- Suggest and implement optimisations (indexes, query changes, caching)
-
----
-
-## Completed So Far
-
-### Infrastructure
-- [x] 3-service e-commerce Docker Compose stack (user, product, order services)
-- [x] Nginx API gateway routing all three services at `:80`
-- [x] React SPA frontend at `:3000`
-- [x] PostgreSQL databases seeded: 10K users, 5K products, 50K orders
-
-### MCP Integration
-- [x] `user-db` MCP connection (PostgreSQL on :5433)
-- [x] `product-db` MCP connection (PostgreSQL on :5434)
-- [x] `order-db` MCP connection (PostgreSQL on :5435)
-- [x] Cross-database queries working via Claude Code
-
-### Bug Fixes
-- [x] Fixed login 422 error — added email filter to user service query
-- [x] Fixed order service user filtering
-
-### Test Data
-- [x] `test-data/test-data-checkout.csv` — 500 customers with recent orders, joined across all 3 databases, ready for k6 parameterisation
-
-### Kubernetes (AKS) Deployment
-- [x] Full AKS deployment — cluster `aks-perf-demo`, namespace `perf-demo`, region `northeurope`
-- [x] All services running: user-service, product-service, order-service, frontend + 3 PostgreSQL DBs
-- [x] Nginx ingress controller — single public IP `20.82.174.115` for all routes
-- [x] Frontend live at `http://20.82.174.115`
-- [x] AKS MCP connections: `user-db-aks` (:15433), `product-db-aks` (:15434), `order-db-aks` (:15435) via kubectl port-forward
-- [x] AKS databases seeded: 10K users, 5K products, 50K orders
-
-### Log Shipping (Loki)
-- [x] Local Docker: Promtail in docker-compose, Docker socket discovery, `job="docker-compose"`
-- [x] AKS: Promtail DaemonSet in `k8s/promtail/` — 8/8 pods discovered, 81K+ entries shipped
-- [x] Grafana Loki verified — query `{namespace="perf-demo"}` shows all AKS service logs
-- [x] analysis-agent.md reads `LOKI_QUERY_FILTER` from `.env.active` (env-aware queries)
-
-### k6 Load Testing
-- [x] `k6/config/config.js` — environment switcher (`TARGET_ENV=local` or `aks`, defaults to AKS `http://20.82.174.115`)
-- [x] `k6/config/grafana-config.js` — Grafana Cloud Prometheus remote write settings
-- [x] `k6/scripts/baseline-test.js` — 10 VUs, 5 min, 4 transaction groups with custom trends
-- [x] `k6/scripts/stress-test.js` — stepped ramp 10→25→50→100 VUs
-- [x] `k6/scripts/peak-load-test.js` — ramp to 50 VUs, hold, ramp down
-- [x] `k6/scripts/realistic-load-test.js` — 4 weighted scenarios (browse/cart/checkout/history)
-- [x] `k6/scripts/generate-test-data.js` — Node.js script to regenerate CSV from any env
-- [x] `k6/data/test-data-checkout.csv` — 500 rows regenerated from AKS databases
-- [x] Grafana Cloud integration working — metrics streaming via Prometheus remote write
-- [x] Baseline test result: p(95)=52ms, 0% errors, 7.74 req/s at 10 VUs over 5 min
-
----
-
-## AKS Deployment
-
-### Cluster Details
-| Property | Value |
-|---|---|
-| Cluster | `aks-perf-demo` |
-| Resource Group | `rg-perf-demo` |
-| Region | `northeurope` |
-| Namespace | `perf-demo` |
-| Node Architecture | **ARM64** (Ampere-based VM SKU) |
-| ACR | `pavaniperfdemo.azurecr.io` |
-
-### Live URLs
-| Route | Service |
-|---|---|
-| `http://20.82.174.115` | React SPA (frontend) |
-| `http://20.82.174.115/api/users` | User service |
-| `http://20.82.174.115/api/products` | Product service |
-| `http://20.82.174.115/api/orders` | Order service |
-
-### k8s Directory Structure
-```
-k8s/
-├── namespace.yaml
-├── secrets.yaml                  # db-secrets with PostgreSQL connection URLs
-├── postgres/
-│   ├── user-db.yaml              # PVC + Deployment + ClusterIP Service
-│   ├── product-db.yaml
-│   └── order-db.yaml
-├── user-service/
-│   ├── deployment.yaml
-│   └── service.yaml              # ClusterIP (ingress handles external access)
-├── product-service/
-│   ├── deployment.yaml
-│   └── service.yaml
-├── order-service/
-│   ├── deployment.yaml
-│   └── service.yaml
-├── frontend/
-│   ├── deployment.yaml
-│   └── service.yaml
-├── ingress/
-│   └── ingress.yaml              # Nginx ingress — 4 separate Ingress objects
-├── promtail/
-│   ├── configmap.yaml            # Kubernetes pod log discovery, ships to Loki
-│   ├── secret.yaml               # Template only — apply credentials via kubectl directly
-│   ├── serviceaccount.yaml       # ServiceAccount: promtail in perf-demo
-│   ├── clusterrole.yaml          # get/watch/list nodes, pods, services, endpoints, namespaces
-│   ├── clusterrolebinding.yaml   # Bind ClusterRole to promtail ServiceAccount
-│   └── daemonset.yaml            # grafana/promtail:3.0.0 DaemonSet
-├── deploy.sh                     # Full deploy script with rollout waits
-└── build-and-push.sh             # Build & push all images (ARM64)
-```
-
-### Deploying to AKS
-
-**Step 1 — Build and push images (from WSL2, must be ARM64):**
-```bash
-./k8s/build-and-push.sh
-```
-
-**Step 2 — Deploy:**
-```bash
-az aks get-credentials --resource-group rg-perf-demo --name aks-perf-demo
-./k8s/deploy.sh
-```
-
-**Nginx ingress controller** (installed once, not in deploy.sh):
-```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.12.0/deploy/static/provider/cloud/deploy.yaml
-```
-
-### Critical Lessons Learned
-
-**1. AKS node pool is ARM64**
-The VM SKU is Ampere/ARM-based. All images MUST be built for `linux/arm64`.
-Always use: `--platform linux/arm64`
-
-**2. Build images from WSL2, not Windows PowerShell**
-Docker Desktop on Windows creates OCI manifest indexes that AKS containerd cannot parse.
-Build from WSL2 with `--provenance=false` to get a clean single-arch manifest:
-```bash
-docker build --platform linux/arm64 --no-cache --provenance=false \
-  -t pavaniperfdemo.azurecr.io/<service>:latest ./<service>
-```
-
-**3. ACR must be attached to AKS**
-Run once after cluster creation:
-```bash
-az aks update --name aks-perf-demo --resource-group rg-perf-demo --attach-acr pavaniperfdemo
-```
-
-**4. PostgreSQL PGDATA on Azure Disk PVCs**
-Azure Disk PVCs have a `lost+found` directory at the mount root. PostgreSQL `initdb`
-fails if `PGDATA` points directly at the mount. All postgres deployments set:
-```yaml
-- name: PGDATA
-  value: /var/lib/postgresql/data/pgdata
-```
-
-**5. Windows CRLF in shell scripts**
-Git on Windows converts LF→CRLF on checkout. Shell scripts baked into Docker images
-get `exec format error` on Linux. Fixed by:
-- `.gitattributes` enforcing `eol=lf` for all `.sh`, `.py`, `Dockerfile` files
-- Inlining CMD in Dockerfiles instead of calling `start.sh`
-
-**6. Azure public IP quota**
-Free/trial subscriptions have a limit on public IPs. Use a single Nginx ingress
-controller instead of `LoadBalancer` type per service. All services use `ClusterIP`.
-
-**7. ACR Tasks not available on Basic tier**
-`az acr build` requires Standard or Premium ACR tier. Use WSL2 builds instead.
-
-**8. Promtail DaemonSet — HOSTNAME must be the node name, not the pod name**
-Promtail auto-adds `spec.nodeName=$(HOSTNAME)` to only discover pods on its own node.
-In Kubernetes, `HOSTNAME` defaults to the pod name (e.g. `promtail-7nffn`), not the node name.
-This causes 0/0 targets. Fix by injecting the actual node name via the downward API:
-```yaml
-- name: HOSTNAME
-  valueFrom:
-    fieldRef:
-      fieldPath: spec.nodeName
-```
-
-**9. Promtail drop rule with empty regex drops all targets**
-`action: drop` with `regex: ""` is parsed as `regex: null` → matches everything → drops all pods.
-Never use an empty regex as a guard. Remove the rule or use a real exclusion pattern.
-
-**10. Grafana Cloud token — use the same token for Prometheus and Loki**
-The existing `k6-metrics-write-k6-token` has both `metrics:write` and `logs:write` scope.
-Use the same `LOKI_PASSWORD` / `GRAFANA_API_TOKEN` for both Prometheus remote write and Loki push.
-
-**11. AKS secret creation — strip CRLF from token before applying**
-`source .env` on Windows bash includes `\r` characters, which silently corrupts the token
-and produces an empty or invalid secret value. Always extract with `tr -d '\r'`:
-```bash
-TOKEN=$(grep "^LOKI_PASSWORD=" .env | tr -d '\r' | cut -d'=' -f2-)
-kubectl create secret generic grafana-credentials \
-  --namespace perf-demo \
-  --from-literal=GRAFANA_API_TOKEN="${TOKEN}" \
-  --from-literal=LOKI_USERNAME="1494446" \
-  --from-literal=LOKI_URL="https://logs-prod-025.grafana.net" \
-  --dry-run=client -o yaml | kubectl apply -f -
-```
-
-## k6 Load Testing
-
-### Directory Structure
-```
-k6/
-├── config/
-│   ├── config.js           # BASE URL switcher — TARGET_ENV=local|aks (default: aks)
-│   └── grafana-config.js   # Grafana Cloud / Prometheus remote write settings
-├── data/
-│   └── test-data-checkout.csv   # 500 rows from AKS DBs (regenerate with generate-test-data.js)
-├── scripts/
-│   ├── baseline-test.js         # 10 VUs, 5 min steady state — establishes baseline
-│   ├── stress-test.js           # Stepped ramp 10→25→50→100 VUs — find breaking point
-│   ├── peak-load-test.js        # Ramp to 50 VUs, hold 5 min — peak traffic model
-│   ├── realistic-load-test.js   # 4 weighted scenarios (browse/cart/checkout/history)
-│   ├── 01-hello-k6.js           # Intro smoke test
-│   ├── run-all-tests.js         # Orchestrator: node k6/scripts/run-all-tests.js
-│   └── generate-test-data.js    # Regenerate CSV: node k6/scripts/generate-test-data.js [local|aks]
-└── results/
-    └── *.html / *.json          # Auto-generated HTML reports + raw JSON
-```
-
-### Running Tests
-
-**Step 1 — Load credentials (once per shell session):**
-```bash
-set -a && source <(tr -d '\r' < .env) && set +a
-```
-
-**Step 2 — Start AKS port-forwards (if using AKS MCP servers):**
-```bash
-kubectl port-forward -n perf-demo svc/user-db 15433:5432 &
-kubectl port-forward -n perf-demo svc/product-db 15434:5432 &
-kubectl port-forward -n perf-demo svc/order-db 15435:5432 &
-```
-
-**Step 3 — Run a test:**
-```bash
-# With Grafana output (recommended)
-k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
-k6 run --out experimental-prometheus-rw k6/scripts/stress-test.js
-k6 run --out experimental-prometheus-rw k6/scripts/peak-load-test.js
-k6 run --out experimental-prometheus-rw k6/scripts/realistic-load-test.js
-
-# Quick smoke test (no Grafana)
-k6 run --vus 2 --duration 30s k6/scripts/baseline-test.js
-
-# Target local Docker stack instead of AKS
-TARGET_ENV=local k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
-```
-
-### Grafana Cloud
-| Setting | Value |
-|---|---|
-| Stack URL | `https://myperformanceproject.grafana.net` |
-| Prometheus endpoint | `https://prometheus-prod-39-prod-eu-north-0.grafana.net/api/prom/push` |
-| Username | `2997542` |
-| Password | stored in `.env` as `K6_PROMETHEUS_RW_PASSWORD` |
-
-### Baseline Performance Results (AKS, 2026-03-06)
-| Transaction | Avg | p(90) | p(95) | Threshold |
-|---|---|---|---|---|
-| Login Page | 42.84ms | 48ms | 52ms | <1500ms ✅ |
-| Products Page | 40.28ms | 44ms | 47ms | <1500ms ✅ |
-| Product Detail | 36.72ms | 40ms | 42ms | <1500ms ✅ |
-| Checkout | 47.48ms | 53ms | 56ms | <1500ms ✅ |
-| **Overall** | **41.62ms** | **49ms** | **52ms** | **<1500ms ✅** |
-
-Load: 10 VUs · 5 min · 590 iterations · 2,360 requests · 7.74 req/s · 0% errors
-
-## Environment Switching
-
-The project supports two target environments. Always check which is active before querying databases or running tests.
-
-### Detecting the active environment
-
-Read `.env.active` (created by the switch script):
-
-```bash
-grep "^ENVIRONMENT=" .env.active 2>/dev/null || echo "No .env.active — defaulting to local"
-```
-
-| `ENVIRONMENT` | k6 target | MCP servers | DB ports |
-|---|---|---|---|
-| `local` | `http://localhost:80` | `user-db`, `product-db`, `order-db` | 5433 / 5434 / 5435 |
-| `aks` | `http://20.82.174.115` | `user-db-aks`, `product-db-aks`, `order-db-aks` | 15433 / 15434 / 15435 |
-
-### Switching environments
-
+### Run pipeline against AKS
 ```powershell
 # PowerShell
 .\scripts\switch-env.ps1 -env aks
+```
+Then prompt the Orchestrator agent:
+> "Run the full performance pipeline for checkout regression against AKS"
+
+### Run pipeline against local Docker
+```powershell
 .\scripts\switch-env.ps1 -env local
+docker compose up -d
 ```
+Then prompt the Orchestrator agent:
+> "Run the full performance pipeline for checkout regression against local"
 
-```bash
-# Bash / WSL2
-./scripts/switch-env.sh aks
-./scripts/switch-env.sh local
-```
+---
 
-### Running k6 after switching
+## Environment Setup
 
-> **IMPORTANT — always regenerate the CSV after switching environments.**
-> The CSV contains emails and IDs from a specific database. After switching
-> from local→AKS or AKS→local the emails won't match and login checks will fail.
+### Local prerequisites
+- Docker Desktop running
+- `docker compose up -d` (all 8 services healthy)
+- `set -a && source <(tr -d '\r' < .env) && set +a` (load Grafana tokens)
 
-```bash
-# 1. Switch environment
-./scripts/switch-env.sh aks          # or: local
-
-# 2. Regenerate CSV from the active environment's databases
-node k6/scripts/generate-test-data.js aks   # or: local
-
-# 3. Load env vars (including Grafana token — paste into .env first)
-set -a && source <(tr -d '\r' < .env) && set +a
-
-# 4. Run test
-k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
-```
+### AKS prerequisites
+- `az aks get-credentials --resource-group rg-perf-demo --name aks-perf-demo`
+- All 8 pods running: `kubectl get pods -n perf-demo`
+- Port-forwards active for MCP DB access:
+  ```bash
+  kubectl port-forward -n perf-demo svc/user-db 15433:5432 &
+  kubectl port-forward -n perf-demo svc/product-db 15434:5432 &
+  kubectl port-forward -n perf-demo svc/order-db 15435:5432 &
+  ```
+- Grafana token pasted into `.env` (`GRAFANA_API_TOKEN`, `K6_PROMETHEUS_RW_PASSWORD`, `LOKI_PASSWORD`)
 
 ### Environment files
-
 | File | Description |
 |---|---|
 | `.env.local` | Local Docker config — committed, no secrets |
@@ -511,6 +112,189 @@ k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
 | `.env` | Active env + secrets (gitignored) |
 | `.env.active` | Active env marker, no secrets (gitignored) |
 
-**Secrets** (`K6_PROMETHEUS_RW_PASSWORD`, `LOKI_PASSWORD`) are never committed.
-After switching environments, paste the token into `.env` manually.
+---
 
+## MCP Servers
+
+| MCP Server | Environment | Database | Port |
+|---|---|---|---|
+| `user-db` | local | userdb | 5433 |
+| `product-db` | local | productdb | 5434 |
+| `order-db` | local | orderdb | 5435 |
+| `user-db-aks` | aks | userdb | 15433 (port-forward) |
+| `product-db-aks` | aks | productdb | 15434 (port-forward) |
+| `order-db-aks` | aks | orderdb | 15435 (port-forward) |
+| `mcp-atlassian` | local | Jira (SCRUM project) | cloud |
+| `azure-devops` | aks | Azure DevOps | cloud |
+
+**Always read `.env.active` first to determine which MCP servers to use.**
+
+---
+
+## Agent Pipeline
+
+| Step | Agent | File | Description |
+|---|---|---|---|
+| 0 | Health Check | `agents/healthcheck-agent.md` | Validates services, pods, DB connectivity. Stops pipeline on failure. |
+| 1 | Data | `agents/data-agent.md` | Queries live DBs via MCP, generates `k6/data/test-data-checkout.csv` |
+| 2 | Execution | `agents/execution-agent.md` | Runs k6 baseline/stress/realistic test, writes JSON + HTML results |
+| 3 | Analysis | `agents/analysis-agent.md` | Interprets k6 results, queries Loki for errors, determines PASS/FAIL |
+| 4 | Reporting | `agents/reporting-agent.md` | Creates Jira issue (local) or Azure DevOps work item (AKS) with evidence |
+
+**Orchestrator file:** `agents/orchestrator.md`
+
+### Pipeline handoff
+```
+Orchestrator
+  → Health Check Agent  (HEALTH_CHECK_PASSED / HEALTH_CHECK_FAILED)
+  → Data Agent          (file_path, row_count, environment)
+  → Execution Agent     (results_json, html_report, summary stats)
+  → Analysis Agent      (verdict: PASS/FAIL, threshold_breaches, loki_errors)
+  → Reporting Agent     (ticket_url, ticket_id)
+```
+
+---
+
+## k6 Test Scripts
+
+```
+k6/
+├── config/
+│   ├── config.js              # BASE_URL switcher (TARGET_ENV=local|aks)
+│   └── grafana-config.js      # Grafana Cloud Prometheus remote write
+├── data/
+│   └── test-data-checkout.csv # 500 rows — regenerate when switching envs!
+├── scripts/
+│   ├── baseline-test.js       # 10 VUs, 2 min — tight thresholds (p95<20ms)
+│   ├── stress-test.js         # Stepped ramp 10→25→50→100 VUs
+│   ├── peak-load-test.js      # Ramp to 50 VUs, hold 5 min
+│   ├── realistic-load-test.js # 4 weighted scenarios
+│   └── generate-test-data.js  # Regenerates CSV from any env
+└── results/
+    └── *.html / *.json        # Auto-generated reports
+```
+
+### Running k6 manually
+```bash
+# With Grafana output (requires .env loaded)
+k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
+
+# Target local Docker
+TARGET_ENV=local k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
+```
+
+### Current thresholds (baseline-test.js) — intentionally tight to trigger regression
+```
+http_req_duration: p(95)<20ms
+errors:            rate==0
+checks:            rate==1.0
+```
+
+### Baseline results (AKS, 2026-03-06, original 1500ms thresholds)
+| Transaction | p(95) |
+|---|---|
+| Login Page | 52ms |
+| Products Page | 47ms |
+| Product Detail | 42ms |
+| Checkout | 56ms |
+
+---
+
+## Observability
+
+### Grafana Cloud
+| Setting | Value |
+|---|---|
+| Stack URL | `https://myperformanceproject.grafana.net` |
+| Dashboard | `https://myperformanceproject.grafana.net/d/k6-perf-v3` |
+| Prometheus endpoint | `https://prometheus-prod-39-prod-eu-north-0.grafana.net/api/prom/push` |
+| Prometheus username | `2997542` |
+| Loki endpoint | `https://logs-prod-025.grafana.net` |
+| Loki username | `1494446` |
+
+### Loki queries
+| Environment | Query |
+|---|---|
+| local | `{job="docker-compose"} \|= "error"` |
+| aks | `{namespace="perf-demo"} \|= "error"` |
+
+Token: stored in `.env` as `GRAFANA_API_TOKEN` / `LOKI_PASSWORD` (same value, never committed).
+
+### Log shipping
+- **Local:** Promtail in docker-compose with Docker socket discovery, `job="docker-compose"`
+- **AKS:** Promtail DaemonSet in `k8s/promtail/` — ships all pod logs, `namespace="perf-demo"`
+
+---
+
+## AKS Deployment
+
+### Cluster details
+| Property | Value |
+|---|---|
+| Cluster | `aks-perf-demo` |
+| Resource Group | `rg-perf-demo` |
+| Region | `northeurope` |
+| Namespace | `perf-demo` |
+| Node Architecture | ARM64 (Ampere) |
+| ACR | `pavaniperfdemo.azurecr.io` |
+| Public IP | `20.82.174.115` |
+
+### k8s directory structure
+```
+k8s/
+├── namespace.yaml
+├── secrets.yaml
+├── postgres/           # user-db, product-db, order-db (PVC + Deployment + Service)
+├── user-service/
+├── product-service/
+├── order-service/
+├── frontend/
+├── ingress/            # Nginx ingress — 4 Ingress objects
+├── promtail/           # DaemonSet log shipping to Loki
+├── deploy.sh
+└── build-and-push.sh   # ARM64 images via WSL2
+```
+
+---
+
+## Known Issues & Fixes
+
+### 1. Stale CSV after switching environments
+**Symptom:** `Login Page | User returned` check fails 100%; error_rate=25%, checks=87.5% despite HTTP 200.
+**Cause:** Local and AKS DBs have completely different seed data — emails don't match across environments.
+**Fix:** Always regenerate CSV after switching:
+```bash
+# After switching to local:
+cd k6 && node scripts/generate-test-data.js local
+
+# After switching to AKS (port-forwards must be active first):
+kubectl port-forward -n perf-demo svc/user-db 15433:5432 &
+kubectl port-forward -n perf-demo svc/product-db 15434:5432 &
+kubectl port-forward -n perf-demo svc/order-db 15435:5432 &
+cd k6 && node scripts/generate-test-data.js aks
+```
+
+### 2. Windows Docker IPv6 binding (ECONNRESET)
+**Symptom:** `generate-test-data.js` fails with ECONNRESET when connecting to local DBs.
+**Cause:** `localhost` resolves to `::1` (IPv6) on Windows, but Docker binds on `0.0.0.0` (IPv4).
+**Fix:** `generate-test-data.js` uses `127.0.0.1` everywhere (already fixed). Never use `localhost` for Docker DB connections on Windows.
+**Secondary:** Run from `k6/` directory (not `k6/scripts/`) so `node_modules/pg` is found:
+```bash
+cd k6 && node scripts/generate-test-data.js local
+```
+
+### 3. AKS images must be ARM64 built from WSL2
+**Cause:** AKS node pool is Ampere ARM64. Docker Desktop on Windows produces OCI manifest indexes that AKS containerd rejects.
+**Fix:** Always build from WSL2 with `--platform linux/arm64 --provenance=false`.
+
+### 4. Grafana Cloud token — use same token for Prometheus and Loki
+The `k6-metrics-write-k6-token` has both `metrics:write` and `logs:write` scope. Use the same token for `GRAFANA_API_TOKEN`, `K6_PROMETHEUS_RW_PASSWORD`, and `LOKI_PASSWORD`.
+When creating AKS secrets, strip CRLF with `tr -d '\r'` to avoid silent token corruption.
+
+### 5. nginx host port mapped to 8080 (not 80)
+**Cause:** Windows IPv6/WSL conflict on port 80.
+**Fix:** nginx is mapped to `127.0.0.1:8080:80` in docker-compose. Local k6 target is `http://localhost:8080`.
+
+### 6. Windows CRLF in shell scripts
+Git on Windows converts LF→CRLF. Shell scripts baked into Docker images get `exec format error` on Linux.
+**Fix:** `.gitattributes` enforces `eol=lf` for all `.sh`, `.py`, `Dockerfile` files.
