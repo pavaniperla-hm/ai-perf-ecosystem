@@ -7,6 +7,48 @@ produce a clear PASS or FAIL verdict with root-cause evidence.
 
 ---
 
+## Configuration (auto-loaded from .env.active)
+
+**Before doing anything else**, read `.env.active` and `.env` to load all required values:
+
+```bash
+# From .env.active (committed, no secrets)
+LOKI_URL=$(grep "^LOKI_URL=" .env.active | tr -d '\r' | cut -d'=' -f2-)
+LOKI_USERNAME=$(grep "^LOKI_USERNAME=" .env.active | tr -d '\r' | cut -d'=' -f2-)
+LOKI_QUERY_FILTER=$(grep "^LOKI_QUERY_FILTER=" .env.active | tr -d '\r' | cut -d'=' -f2-)
+ENVIRONMENT=$(grep "^ENVIRONMENT=" .env.active | tr -d '\r' | cut -d'=' -f2-)
+
+# From .env (gitignored, contains secrets)
+LOKI_PASSWORD=$(grep "^LOKI_PASSWORD=" .env | tr -d '\r' | cut -d'=' -f2-)
+# Also try GRAFANA_API_TOKEN as alias if LOKI_PASSWORD is empty
+[ -z "$LOKI_PASSWORD" ] && LOKI_PASSWORD=$(grep "^GRAFANA_API_TOKEN=" .env | tr -d '\r' | cut -d'=' -f2-)
+```
+
+| Variable | Source | Value (AKS example) |
+|---|---|---|
+| `LOKI_URL` | `.env.active` | `https://logs-prod-025.grafana.net` |
+| `LOKI_USERNAME` | `.env.active` | `1494446` |
+| `LOKI_PASSWORD` | `.env` (secret) | Grafana API token |
+| `LOKI_QUERY_FILTER` | `.env.active` | `{namespace="perf-demo"}` (AKS) or `{job="docker-compose"}` (local) |
+| `ENVIRONMENT` | `.env.active` | `aks` or `local` |
+
+**Loki queries by environment:**
+
+| Environment | LOKI_QUERY_FILTER | Error query example |
+|---|---|---|
+| `local` | `{job="docker-compose"}` | `{job="docker-compose"} \|= "error"` |
+| `aks` | `{namespace="perf-demo"}` | `{namespace="perf-demo"} \|= "error"` |
+
+Log at startup:
+```
+[ANALYSIS AGENT] Environment  : <ENVIRONMENT>
+[ANALYSIS AGENT] Loki URL     : <LOKI_URL>
+[ANALYSIS AGENT] Loki filter  : <LOKI_QUERY_FILTER>
+[ANALYSIS AGENT] Loki token   : <set ✅ | NOT SET ⚠️ — log correlation will be skipped>
+```
+
+---
+
 ## Inputs
 
 ```
@@ -21,7 +63,7 @@ start_time:       string    # ISO 8601 UTC — start of k6 test
 end_time:         string    # ISO 8601 UTC — end of k6 test
 results_file:     string
 scenario:         string
-threshold_p99_ms: int       # default 500
+threshold_p99_ms: int       # default 20
 ```
 
 ---
@@ -33,17 +75,17 @@ Check each threshold in order. A single breach makes the overall verdict FAIL.
 | # | Threshold | Limit | Source metric | Breach condition |
 |---|---|---|---|---|
 | 1 | p99 response time | `< threshold_p99_ms` ms | `p95_ms` (proxy) | `p95_ms > threshold_p99_ms * 0.85` |
-| 2 | Error rate | `< 1%` | `error_rate` | `error_rate > 0.01` |
-| 3 | Checks success | `> 99%` | `checks_rate` | `checks_rate < 0.99` |
+| 2 | Error rate | `= 0%` | `error_rate` | `error_rate > 0` |
+| 3 | Checks success | `= 100%` | `checks_rate` | `checks_rate < 1.0` |
 
 **p99 proxy rule:** because k6 exports p95 by default, compare p95 against
-85% of the p99 threshold. For example if `threshold_p99_ms = 500`, breach if
-`p95_ms > 425ms`. Clearly note in the output that p99 is estimated from p95.
+85% of the p99 threshold. For example if `threshold_p99_ms = 20`, breach if
+`p95_ms > 17ms`. Clearly note in the output that p99 is estimated from p95.
 
 For each threshold, record:
 ```
 name:   "p99 response time"
-limit:  "< 500ms"
+limit:  "< 20ms"
 actual: "p95=43ms (p99 estimated)"
 status: "PASS" | "FAIL"
 ```
@@ -57,42 +99,31 @@ received from the Execution Agent.
 
 ### Authentication
 
-Load all Loki connection details from `.env.active` (set by switch-env scripts).
-Never hardcode credentials.
+Load all Loki connection details from `.env.active` and `.env` as described in
+the Configuration section above. Never hardcode credentials.
 
-On Windows, load via PowerShell:
-```powershell
-$env_vars = @{}
-Get-Content ".env.active" | Where-Object { $_ -match "^[^#].+=.+" } | ForEach-Object {
-    $parts = $_ -split "=", 2
-    $env_vars[$parts[0].Trim()] = $parts[1].Trim()
-}
-$LOKI_URL      = $env_vars["LOKI_URL"]       # e.g. https://logs-prod-025.grafana.net
-$LOKI_USERNAME = $env_vars["LOKI_USERNAME"]  # e.g. 1494446
-$LOKI_PASSWORD = $env_vars["LOKI_PASSWORD"]  # Grafana API token (never committed)
-$LOKI_QUERY_FILTER = $env_vars["LOKI_QUERY_FILTER"]
-# local:  {job="docker-compose"}
-# aks:    {namespace="perf-demo"}
-```
-
-Disable certificate revocation check (required on Windows):
-```powershell
-[System.Net.ServicePointManager]::CheckCertificateRevocationList = $false
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+Use bash curl (works on Windows with Git Bash / WSL):
+```bash
+LOKI_URL=$(grep "^LOKI_URL=" .env.active | tr -d '\r' | cut -d'=' -f2-)
+LOKI_USERNAME=$(grep "^LOKI_USERNAME=" .env.active | tr -d '\r' | cut -d'=' -f2-)
+LOKI_QUERY_FILTER=$(grep "^LOKI_QUERY_FILTER=" .env.active | tr -d '\r' | cut -d'=' -f2-)
+LOKI_PASSWORD=$(grep "^LOKI_PASSWORD=" .env | tr -d '\r' | cut -d'=' -f2-)
+[ -z "$LOKI_PASSWORD" ] && LOKI_PASSWORD=$(grep "^GRAFANA_API_TOKEN=" .env | tr -d '\r' | cut -d'=' -f2-)
 ```
 
 ### Time Window
 
-Convert `start_time` and `end_time` to Unix nanoseconds:
-```powershell
-$startNs = ([DateTimeOffset]::Parse($start_time)).ToUnixTimeMilliseconds() * 1000000L
-$endNs   = ([DateTimeOffset]::Parse($end_time)).ToUnixTimeMilliseconds() * 1000000L
+Convert `start_time` and `end_time` to Unix nanoseconds for the Loki API:
+```bash
+# Convert ISO 8601 to nanoseconds
+START_NS=$(date -d "<start_time>" +%s%N 2>/dev/null || echo "<manual_ns>")
+END_NS=$(date -d "<end_time>" +%s%N 2>/dev/null || echo "<manual_ns>")
 ```
 
 ### Queries to Run
 
-Run all three queries against `$LOKI_URL/loki/api/v1/query_range`.
-Use `$LOKI_QUERY_FILTER` as the base selector (read from `.env.active`):
+Run all three queries against `${LOKI_URL}/loki/api/v1/query_range`.
+Use `LOKI_QUERY_FILTER` as the base selector (read from `.env.active`):
 
 | Query # | LogQL | Purpose |
 |---|---|---|
@@ -103,6 +134,16 @@ Use `$LOKI_QUERY_FILTER` as the base selector (read from `.env.active`):
 **Examples by environment:**
 - Local Docker: `{job="docker-compose"} |= "error"`
 - AKS: `{namespace="perf-demo"} |= "error"`
+
+```bash
+curl -s --ssl-no-revoke -G "${LOKI_URL}/loki/api/v1/query_range" \
+  --data-urlencode "query=${LOKI_QUERY_FILTER} |= \"error\"" \
+  --data-urlencode "start=${START_NS}" \
+  --data-urlencode "end=${END_NS}" \
+  --data-urlencode "limit=200" \
+  --data-urlencode "direction=backward" \
+  -u "${LOKI_USERNAME}:${LOKI_PASSWORD}"
+```
 
 Parameters: `limit=200`, `direction=backward`
 
@@ -127,7 +168,7 @@ log_summary:
       message:   string
 ```
 
-If Loki is unreachable, set `log_summary.error` = "Loki query failed: <reason>"
+If Loki is unreachable or token is missing, set `log_summary.error` = "Loki query failed: <reason>"
 and continue — do not fail the pipeline because of a Loki outage.
 
 ---
@@ -153,7 +194,7 @@ had the most log errors:
 | `error_rate` breached | "Investigate HTTP 5xx responses — check order-service and user-service logs in Loki" |
 | `checks_rate` breached | "Review k6 check logic — one or more API responses returned unexpected status codes or body structure" |
 | `log_summary.error_count > 0` | "Fix application errors in: <affected_services>" |
-| All thresholds pass | "System is healthy. Consider tightening thresholds or increasing VU count for next run." |
+| All thresholds pass | "System is healthy. Thresholds are already tight (p99<20ms, 0% errors, 100% checks). Consider increasing VU count for next run." |
 
 Include all applicable next steps (can be multiple).
 
@@ -191,18 +232,19 @@ Print to user:
   — Loki: 0 errors, 0 warnings across all services
 
 [ANALYSIS AGENT] Verdict: FAIL ❌
-  — p99 threshold breached: p95=43ms exceeds 85% of 500ms limit (425ms)
+  — p99 threshold breached: p95=43ms exceeds 85% of 20ms limit (17ms)
   — Loki: 3 errors in order-service, 0 warnings
-  — Recommending Jira ticket creation
+  — Recommending ticket creation
 ```
 
 ---
 
 ## Rules
 
+- Always load credentials from `.env.active` (config) and `.env` (secrets) — never hardcode
 - Never modify threshold definitions — only evaluate what you receive
 - Always query Loki for the **exact test window** from start_time to end_time
-- Always load Loki credentials and query filter from `.env.active` — never hardcode credentials
+- Always use `LOKI_QUERY_FILTER` from `.env.active` — never hardcode the LogQL selector
 - If log_summary cannot be obtained, still produce a verdict based on metrics alone
   and note "Loki data unavailable" in the ticket
-- Do not create Jira tickets — that is the Reporting Agent's responsibility
+- Do not create tickets — that is the Reporting Agent's responsibility

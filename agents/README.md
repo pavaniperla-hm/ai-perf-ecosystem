@@ -18,7 +18,15 @@ correlation, and Jira reporting — with minimal human intervention.
   │  Coordinates all agents. Stops pipeline on failure.  │
   └──────┬──────────────────────────────────────────────┘
          │
-         │ scenario, row_target
+         │ (reads .env.active → environment config)
+         ▼
+  ┌──────────────────────┐
+  │  HEALTH CHECK AGENT  │  Validates pods/containers, HTTP endpoints,
+  │  (Step 0 — pre-flight│  and DB connectivity before any test runs.
+  │   validation)        │  FAILED → pipeline stops immediately.
+  └──────┬───────────────┘
+         │
+         │ HEALTH_CHECK_PASSED → scenario, row_target
          ▼
   ┌──────────────┐
   │  DATA AGENT  │  Queries 3 PostgreSQL databases via MCP.
@@ -45,7 +53,7 @@ correlation, and Jira reporting — with minimal human intervention.
          │ verdict, threshold_results, log_summary, next_steps
          ▼
   ┌──────────────────┐
-  │ REPORTING AGENT  │  FAIL → creates High priority Jira Bug (SCRUM)
+  │ REPORTING AGENT  │  FAIL → creates ticket (Jira or Azure DevOps)
   │                  │         with metrics + Loki evidence sections.
   │                  │  PASS → prints green summary, no ticket.
   └──────────────────┘
@@ -61,10 +69,11 @@ correlation, and Jira reporting — with minimal human intervention.
 | File | Role | Key tools used |
 |---|---|---|
 | [`orchestrator.md`](orchestrator.md) | Pipeline coordinator | — |
+| [`healthcheck-agent.md`](healthcheck-agent.md) | Pre-flight validation (Step 0) | Bash (docker/kubectl/curl), MCP DBs |
 | [`data-agent.md`](data-agent.md) | Test data extraction | MCP (user-db, product-db, order-db) |
 | [`execution-agent.md`](execution-agent.md) | k6 test runner | Bash, k6, Prometheus remote write |
-| [`analysis-agent.md`](analysis-agent.md) | Metrics + log correlation | PowerShell, Loki HTTP API |
-| [`reporting-agent.md`](reporting-agent.md) | Jira ticket creation | mcp-atlassian |
+| [`analysis-agent.md`](analysis-agent.md) | Metrics + log correlation | Bash, Loki HTTP API |
+| [`reporting-agent.md`](reporting-agent.md) | Ticket creation (Jira or Azure DevOps) | mcp-atlassian / curl REST API |
 
 ---
 
@@ -94,6 +103,13 @@ Claude will act as the Orchestrator, invoking each agent in sequence.
 
 ```
   Orchestrator
+      │
+      ├─► HEALTH CHECK AGENT receives:
+      │     (none — reads .env.active automatically)
+      │
+      │   HEALTH CHECK AGENT returns:
+      │     HEALTH_CHECK_PASSED → status, services_checked, response_times, db_row_counts
+      │     HEALTH_CHECK_FAILED → failed_checks (pipeline stops here)
       │
       ├─► DATA AGENT receives:
       │     scenario, row_target
@@ -185,12 +201,18 @@ Action: Fix the issue above and re-run the pipeline
 
 | Agent | Failure | Fix |
 |---|---|---|
+| Health Check | Pod `CrashLoopBackOff` | `kubectl logs <pod> -n perf-demo --previous` |
+| Health Check | Pod `ImagePullBackOff` | Re-push image: `./k8s/build-and-push.sh` |
+| Health Check | HTTP 503 on endpoint | Service still starting — wait 30s and retry |
+| Health Check | DB connection refused | Start port-forwards: `kubectl port-forward ...` |
+| Health Check | Docker container exited | `docker compose logs <service>` then `docker compose up -d` |
 | Data Agent | `< 10 rows extracted` | Check if orders exist in last 30 days; widen window |
-| Data Agent | `MCP connection failed` | Ensure `docker compose up` is running |
+| Data Agent | `MCP connection failed` | Ensure `docker compose up` is running (local) or port-forwards active (AKS) |
 | Execution Agent | `k6 not found` | Install k6 to `C:\Program Files\k6\` |
 | Execution Agent | `Prometheus 429` | Warning only — test still valid; Grafana free tier rate limit |
 | Analysis Agent | `Loki auth error` | Add `logs:read` scope to Grafana access policy token |
 | Reporting Agent | `Jira tool error` | Check mcp-atlassian MCP server is running; verify JIRA_API_TOKEN |
+| Reporting Agent | `ADO curl error` | Check ADO_MCP_AUTH_TOKEN in `~/.claude.json` |
 
 ---
 

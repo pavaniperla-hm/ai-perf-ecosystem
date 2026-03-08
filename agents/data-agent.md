@@ -6,57 +6,75 @@ the data, and write a CSV file ready for k6 parameterisation.
 
 ---
 
+## Configuration (auto-loaded from .env.active)
+
+**Before doing anything else**, read `.env.active` and extract:
+
+```bash
+ENVIRONMENT=$(grep "^ENVIRONMENT=" .env.active | tr -d '\r' | cut -d'=' -f2-)
+```
+
+| Variable | Used for |
+|---|---|
+| `ENVIRONMENT` | Selects local vs AKS MCP servers |
+
+Map `ENVIRONMENT` to MCP servers:
+
+| `ENVIRONMENT` | MCP servers to use | DB ports |
+|---|---|---|
+| `local` | `user-db`, `product-db`, `order-db` | 5433 / 5434 / 5435 |
+| `aks` | `user-db-aks`, `product-db-aks`, `order-db-aks` | 15433 / 15434 / 15435 |
+
+Log at startup:
+```
+[DATA AGENT] Environment: <ENVIRONMENT>
+[DATA AGENT] MCP servers: <mcp_servers>
+```
+
+If AKS MCP servers are unreachable, remind the user to start port-forwards:
+```bash
+kubectl port-forward -n perf-demo svc/user-db 15433:5432 &
+kubectl port-forward -n perf-demo svc/product-db 15434:5432 &
+kubectl port-forward -n perf-demo svc/order-db 15435:5432 &
+```
+
+---
+
+## ⚠️ Critical: Always Regenerate CSV When Environment Changes
+
+**The local and AKS databases have different seed data — emails, user IDs, and product IDs
+do NOT match between environments.** Using an AKS-generated CSV against local (or vice versa)
+causes all `Login Page | User returned` checks to fail silently (HTTP 200 but empty array).
+
+**Rule: every time the environment changes, regenerate the CSV before running k6.**
+
+```bash
+# After switching to local:
+cd k6 && node scripts/generate-test-data.js local
+
+# After switching to AKS (ensure port-forwards are active first):
+kubectl port-forward -n perf-demo svc/user-db 15433:5432 &
+kubectl port-forward -n perf-demo svc/product-db 15434:5432 &
+kubectl port-forward -n perf-demo svc/order-db 15435:5432 &
+cd k6 && node scripts/generate-test-data.js aks
+```
+
+The script writes to `k6/data/test-data-checkout.csv` and also copies to `k6/data/`.
+It connects via `127.0.0.1` (not `localhost`) to avoid Windows IPv6/Docker ECONNRESET.
+
+**Signs of a stale CSV (wrong environment):**
+- `Login Page | User returned` fails 100% of iterations
+- `error_rate` jumps to 25% even though all HTTP responses are 200
+- `checks` drops to 87.5%
+
+---
+
 ## Inputs
 
 ```
 scenario: string      # plain English description, e.g. "checkout regression"
 row_target: int       # desired number of rows (default: 50)
 ```
-
----
-
-## Environment Detection
-
-**Before querying any database**, read `.env.active` (or `.env` if `.env.active` does not exist)
-to determine which environment is active and which MCP servers to use.
-
-```bash
-grep "^ENVIRONMENT=" .env.active 2>/dev/null || grep "^ENVIRONMENT=" .env
-```
-
-| `ENVIRONMENT` value | MCP servers to use | DB ports |
-|---|---|---|
-| `local` | `user-db`, `product-db`, `order-db` | 5433 / 5434 / 5435 |
-| `aks` | `user-db-aks`, `product-db-aks`, `order-db-aks` | 15433 / 15434 / 15435 |
-
-Always log which environment and MCP servers are being used at the start of every run.
-
----
-
-## Database Connections (MCP)
-
-### Local Docker
-
-| MCP Server   | Host      | Port | DB Name   |
-|---|---|---|---|
-| `user-db`    | localhost | 5433 | userdb    |
-| `product-db` | localhost | 5434 | productdb |
-| `order-db`   | localhost | 5435 | orderdb   |
-
-### AKS (via kubectl port-forward)
-
-| MCP Server       | Host      | Port  | DB Name   |
-|---|---|---|---|
-| `user-db-aks`    | localhost | 15433 | userdb    |
-| `product-db-aks` | localhost | 15434 | productdb |
-| `order-db-aks`   | localhost | 15435 | orderdb   |
-
-> If AKS MCP servers are unreachable, remind the user to start port-forwards:
-> ```bash
-> kubectl port-forward -n perf-demo svc/user-db 15433:5432 &
-> kubectl port-forward -n perf-demo svc/product-db 15434:5432 &
-> kubectl port-forward -n perf-demo svc/order-db 15435:5432 &
-> ```
 
 ---
 
@@ -150,7 +168,10 @@ Failure: print `[DATA AGENT] FAILED: <reason>` and stop.
 ## Rules
 
 - Always read `.env.active` first — never assume local or AKS
-- Always use MCP tool calls — never hardcode data
+- Always regenerate the CSV via `node k6/scripts/generate-test-data.js <env>` at the start of every pipeline run — never reuse a CSV from a different environment
+- Always use MCP tool calls for ad-hoc queries — never hardcode data
 - Always write CSV to `k6/data/` — never to the project root
 - Never include the header row in `row_count`
 - Log which environment, MCP servers, and row counts were used
+- If regeneration fails with `ECONNRESET`, the script is using `localhost` resolving to IPv6; ensure `generate-test-data.js` uses `127.0.0.1` not `localhost`
+- For AKS: start kubectl port-forwards BEFORE running the CSV generator

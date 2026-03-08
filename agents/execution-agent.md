@@ -6,6 +6,41 @@ and return a structured metrics summary.
 
 ---
 
+## Configuration (auto-loaded from .env.active)
+
+**Before doing anything else**, read `.env.active` and extract all required values:
+
+```bash
+# Load all env vars from .env.active (strips CRLF for Windows compatibility)
+set -a && source <(tr -d '\r' < .env.active) && set +a
+
+# Also load secrets from .env (GRAFANA_API_TOKEN, LOKI_PASSWORD, K6_PROMETHEUS_RW_PASSWORD)
+set -a && source <(tr -d '\r' < .env) && set +a
+```
+
+| Variable | Source | Used for |
+|---|---|---|
+| `K6_BASE_URL` | `.env.active` | k6 load test target URL |
+| `K6_PROMETHEUS_RW_SERVER_URL` | `.env.active` | Grafana Cloud metrics endpoint |
+| `K6_PROMETHEUS_RW_USERNAME` | `.env.active` | Grafana Cloud username |
+| `K6_PROMETHEUS_RW_PASSWORD` | `.env` (secret) | Grafana Cloud API token |
+| `GRAFANA_API_TOKEN` | `.env` (secret) | Alias for `K6_PROMETHEUS_RW_PASSWORD` |
+| `ENVIRONMENT` | `.env.active` | For logging |
+
+**Token resolution:** `K6_PROMETHEUS_RW_PASSWORD` and `GRAFANA_API_TOKEN` are the same
+token. If `K6_PROMETHEUS_RW_PASSWORD` is not set, use `GRAFANA_API_TOKEN`. If neither
+is set, log a warning and continue — test results are still valid without Grafana streaming.
+
+Log at startup:
+```
+[EXECUTION AGENT] Environment  : <ENVIRONMENT>
+[EXECUTION AGENT] k6 target    : <K6_BASE_URL>
+[EXECUTION AGENT] Grafana push : <K6_PROMETHEUS_RW_SERVER_URL> (user: <K6_PROMETHEUS_RW_USERNAME>)
+[EXECUTION AGENT] Token        : <set ✅ | NOT SET ⚠️>
+```
+
+---
+
 ## Inputs
 
 ```
@@ -40,9 +75,9 @@ Default to `k6/scripts/baseline-test.js` if no match.
 
 Before running k6:
 
-1. **Load environment variables** — required for Prometheus remote write:
+1. **Load environment variables** from both `.env.active` (config) and `.env` (secrets):
    ```bash
-   set -a && source <(tr -d '\r' < .env) && set +a
+   set -a && source <(tr -d '\r' < .env.active) && source <(tr -d '\r' < .env) && set +a
    ```
 
 2. **Verify k6 is installed:**
@@ -65,7 +100,7 @@ Before running k6:
 ## Run Command
 
 ```bash
-set -a && source <(tr -d '\r' < .env) && set +a && \
+set -a && source <(tr -d '\r' < .env.active) && source <(tr -d '\r' < .env) && set +a && \
 "C:\Program Files\k6\k6.exe" run \
   --out experimental-prometheus-rw \
   --summary-export k6/results/<scenario-slug>-<timestamp>.json \
@@ -165,10 +200,10 @@ Pipeline cannot continue without test results.
 
 ## Rules
 
-- Always record both timestamps — they are required by the Analysis Agent for the
-  Loki time window
+- Always read `.env.active` for config and `.env` for secrets before running
+- Always record both timestamps — they are required by the Analysis Agent for the Loki time window
 - Never modify the k6 test script — run it as-is
 - Always save the JSON summary export — the analysis agent reads from it
 - Print k6 stdout in full so the user can follow progress
-- If Prometheus remote write returns 429 (rate limit), log a warning but do not
-  fail — test results are still valid
+- If Prometheus remote write returns 401 or 429, log a warning but do not
+  fail — test results are still valid; prompt user to set token in `.env`
