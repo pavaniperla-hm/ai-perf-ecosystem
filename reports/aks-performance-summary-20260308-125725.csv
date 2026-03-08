@@ -1,0 +1,2 @@
+Date,Environment,Test,VUs,Duration,TotalRequests,ReqPerSec,AvgResponseMs,p90Ms,p95Ms,MaxResponseMs,ErrorRate,ChecksRate,LoginP95,ProductsP95,ProductDetailP95,CheckoutP95,LokiErrors,LokiWarnings,Verdict,AzureDevOpsIssueId
+2026-03-08,aks,AKS Regression — Checkout,10,5m 21s,2320,7.70,46.49,59.46,65.00,196.79,0.00%,100.00%,66.05,57.00,63.00,69.00,N/A (Loki unavailable),N/A (Loki unavailable),PASS,SKIPPED

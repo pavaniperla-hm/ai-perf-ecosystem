@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AKS Performance Test Report — 2026-03-08</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f4f8;
+      color: #1a2332;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1a3a5c 0%, #0d6efd 100%);
+      color: #fff;
+      padding: 32px 40px 24px;
+    }
+    .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    .header .meta { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 24px; opacity: 0.85; font-size: 13px; }
+    .header .meta span { display: flex; align-items: center; gap: 6px; }
+    .header .meta .label { font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; opacity: 0.7; }
+
+    /* ── Verdict Banner ── */
+    .verdict-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 24px 40px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .verdict-banner.pass { background: #d1fae5; color: #065f46; border-left: 6px solid #10b981; }
+    .verdict-banner.fail { background: #fee2e2; color: #991b1b; border-left: 6px solid #ef4444; }
+    .verdict-banner .verdict-label { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; margin-bottom: 4px; }
+    .verdict-banner .headline-stats { display: flex; gap: 32px; }
+    .verdict-banner .stat { text-align: center; }
+    .verdict-banner .stat-val { font-size: 28px; font-weight: 800; display: block; }
+    .verdict-banner .stat-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; }
+
+    /* ── Layout ── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px 40px; display: grid; gap: 28px; }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+      overflow: hidden;
+    }
+    .card-header {
+      background: #1a3a5c;
+      color: #fff;
+      padding: 14px 24px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .card-body { padding: 24px; }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      background: #eef2f7;
+      color: #4a5568;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 2px solid #cbd5e0;
+    }
+    td { padding: 10px 14px; border-bottom: 1px solid #edf2f7; font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #f7fafc; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+    /* ── Status badges ── */
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; }
+    .badge.pass { background: #d1fae5; color: #065f46; }
+    .badge.fail { background: #fee2e2; color: #991b1b; }
+
+    /* ── Bar chart ── */
+    .bar-wrap { display: flex; align-items: center; gap: 10px; }
+    .bar-track { flex: 1; height: 18px; background: #eef2f7; border-radius: 9px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 9px; background: linear-gradient(90deg, #0d6efd, #0a58ca); transition: width 0.3s; }
+    .bar-fill.slowest { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .bar-val { font-size: 12px; font-weight: 700; min-width: 50px; text-align: right; color: #4a5568; }
+
+    /* ── Log section ── */
+    .log-box {
+      background: #1a2332;
+      color: #a8d8a8;
+      font-family: "Cascadia Code", "Fira Code", "Courier New", monospace;
+      font-size: 12px;
+      padding: 16px 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      line-height: 1.8;
+      margin-top: 12px;
+    }
+    .log-unavailable {
+      background: #fef3c7;
+      color: #92400e;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border-left: 4px solid #f59e0b;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    /* ── Observability buttons ── */
+    .obs-links { display: flex; flex-wrap: wrap; gap: 12px; }
+    .obs-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .obs-btn:hover { opacity: 0.85; }
+    .obs-btn.grafana { background: #ff6b35; color: #fff; }
+    .obs-btn.loki    { background: #f5a623; color: #fff; }
+    .obs-btn.ado     { background: #0078d4; color: #fff; }
+
+    /* ── Recommendations ── */
+    .reco-list { list-style: none; display: grid; gap: 10px; }
+    .reco-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #f0f7ff;
+      border-left: 4px solid #0d6efd;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .reco-list li .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Summary grid ── */
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .summary-card {
+      background: #f0f4f8;
+      border-radius: 8px;
+      padding: 16px 20px;
+      text-align: center;
+    }
+    .summary-card .val { font-size: 28px; font-weight: 800; color: #1a3a5c; }
+    .summary-card .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #718096; margin-top: 4px; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 12px;
+      color: #a0aec0;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .card { box-shadow: none; border: 1px solid #e2e8f0; }
+      .obs-btn { border: 1px solid currentColor; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+<div class="header">
+  <h1>AKS Performance Test Report</h1>
+  <div class="meta">
+    <span><span class="label">Date</span>&nbsp;2026-03-08</span>
+    <span><span class="label">Time (UTC)</span>&nbsp;13:02:34 → 13:07:55</span>
+    <span><span class="label">Environment</span>&nbsp;AKS — Azure Kubernetes Service</span>
+    <span><span class="label">Target</span>&nbsp;http://20.82.174.115</span>
+    <span><span class="label">Duration</span>&nbsp;5 minutes</span>
+    <span><span class="label">VUs</span>&nbsp;10</span>
+    <span><span class="label">Scenario</span>&nbsp;AKS Regression — Checkout</span>
+  </div>
+</div>
+
+<!-- ══ VERDICT BANNER ═══════════════════════════════════════════════════════ -->
+<div class="verdict-banner pass">
+  <div>
+    <div class="verdict-label">Overall Verdict</div>
+    ✅ &nbsp;PASS — All thresholds within limits
+  </div>
+  <div class="headline-stats">
+    <div class="stat">
+      <span class="stat-val">65ms</span>
+      <span class="stat-lbl">p95 Response</span>
+    </div>
+    <div class="stat">
+      <span class="stat-val">0%</span>
+      <span class="stat-lbl">Error Rate</span>
+    </div>
+    <div class="stat">
+      <span class="stat-val">2,320</span>
+      <span class="stat-lbl">Total Requests</span>
+    </div>
+    <div class="stat">
+      <span class="stat-val">7.70</span>
+      <span class="stat-lbl">Req/sec</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ══ THRESHOLD ANALYSIS ═══════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-header">Threshold Analysis</div>
+    <div class="card-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Threshold</th>
+            <th>Limit</th>
+            <th class="num">Actual</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>p99 Response Time <small style="color:#718096">(estimated from p95)</small></td>
+            <td>&lt; 500ms &nbsp;<small style="color:#718096">(breach if p95 &gt; 425ms)</small></td>
+            <td class="num">p95 = 65.00ms</td>
+            <td><span class="badge pass">✅ PASS</span></td>
+          </tr>
+          <tr>
+            <td>Error Rate</td>
+            <td>&lt; 1%</td>
+            <td class="num">0.00%</td>
+            <td><span class="badge pass">✅ PASS</span></td>
+          </tr>
+          <tr>
+            <td>Checks Success Rate</td>
+            <td>&gt; 99%</td>
+            <td class="num">100.00%</td>
+            <td><span class="badge pass">✅ PASS</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ KEY METRICS SUMMARY ══════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-header">Key Metrics at a Glance</div>
+    <div class="card-body">
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="val">46.5ms</div>
+          <div class="lbl">Avg Response</div>
+        </div>
+        <div class="summary-card">
+          <div class="val">59.5ms</div>
+          <div class="lbl">p90 Response</div>
+        </div>
+        <div class="summary-card">
+          <div class="val">65.0ms</div>
+          <div class="lbl">p95 Response</div>
+        </div>
+        <div class="summary-card">
+          <div class="val">196.8ms</div>
+          <div class="lbl">Max Response</div>
+        </div>
+        <div class="summary-card">
+          <div class="val">2,320</div>
+          <div class="lbl">Total Requests</div>
+        </div>
+        <div class="summary-card">
+          <div class="val">580</div>
+          <div class="lbl">Iterations</div>
+        </div>
+        <div class="summary-card">
+          <div class="val">7.70/s</div>
+          <div class="lbl">Throughput</div>
+        </div>
+        <div class="summary-card">
+          <div class="val">4,640</div>
+          <div class="lbl">Checks Passed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ FULL METRICS TABLE ════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-header">Full Performance Metrics</div>
+    <div class="card-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th class="num">VUs</th>
+            <th>Duration</th>
+            <th class="num">Total Reqs</th>
+            <th class="num">Req/s</th>
+            <th class="num">Avg (ms)</th>
+            <th class="num">p90 (ms)</th>
+            <th class="num">p95 (ms)</th>
+            <th class="num">Max (ms)</th>
+            <th class="num">Error %</th>
+            <th class="num">Checks %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>AKS Baseline — Checkout Regression</td>
+            <td class="num">10</td>
+            <td>5m 21s</td>
+            <td class="num">2,320</td>
+            <td class="num">7.70</td>
+            <td class="num">46.49</td>
+            <td class="num">59.46</td>
+            <td class="num">65.00</td>
+            <td class="num">196.79</td>
+            <td class="num">0.00%</td>
+            <td class="num">100.00%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ PER-TRANSACTION BREAKDOWN ════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-header">Per-Transaction p95 Breakdown</div>
+    <div class="card-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Transaction</th>
+            <th class="num">p95 (ms)</th>
+            <th style="width:50%">Relative Performance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Checkout Page</td>
+            <td class="num">69ms</td>
+            <td>
+              <div class="bar-wrap">
+                <div class="bar-track">
+                  <div class="bar-fill slowest" style="width:100%"></div>
+                </div>
+                <span class="bar-val">69ms</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Login Page</td>
+            <td class="num">66ms</td>
+            <td>
+              <div class="bar-wrap">
+                <div class="bar-track">
+                  <div class="bar-fill" style="width:96%"></div>
+                </div>
+                <span class="bar-val">66ms</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Product Detail Page</td>
+            <td class="num">63ms</td>
+            <td>
+              <div class="bar-wrap">
+                <div class="bar-track">
+                  <div class="bar-fill" style="width:91%"></div>
+                </div>
+                <span class="bar-val">63ms</span>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>Products Page</td>
+            <td class="num">57ms</td>
+            <td>
+              <div class="bar-wrap">
+                <div class="bar-track">
+                  <div class="bar-fill" style="width:83%"></div>
+                </div>
+                <span class="bar-val">57ms</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin-top:14px;font-size:12px;color:#718096;">
+        ⚠️ Orange bar = slowest transaction. All transactions are well within the 1500ms threshold.
+        Checkout is consistently the highest-latency transaction, as expected for a write operation (POST /api/orders).
+      </p>
+    </div>
+  </div>
+
+  <!-- ══ LOG EVIDENCE ══════════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-header">Log Evidence (Loki — AKS)</div>
+    <div class="card-body">
+      <table style="margin-bottom:16px;">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="num">Count</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Errors / Exceptions</td>
+            <td class="num">—</td>
+            <td><span class="badge" style="background:#fef3c7;color:#92400e;">⚠️ Unavailable</span></td>
+          </tr>
+          <tr>
+            <td>Warnings</td>
+            <td class="num">—</td>
+            <td><span class="badge" style="background:#fef3c7;color:#92400e;">⚠️ Unavailable</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="log-unavailable">
+        ⚠️ <strong>Loki data was unavailable during this run.</strong><br>
+        The Grafana API token (<code>LOKI_PASSWORD</code>) is not configured in <code>.env</code>.
+        Log correlation could not be performed for the test window
+        <strong>2026-03-08T13:02:34Z → 2026-03-08T13:07:55Z</strong>.<br><br>
+        <strong>Query that would have been used:</strong> <code>{namespace="perf-demo"} |= "error"</code><br>
+        <strong>Loki endpoint:</strong> <code>https://logs-prod-025.grafana.net</code><br><br>
+        To enable log correlation in future runs, paste the Grafana API token into <code>.env</code> as <code>LOKI_PASSWORD=&lt;token&gt;</code>.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ OBSERVABILITY LINKS ═══════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-header">Observability Links</div>
+    <div class="card-body">
+      <div class="obs-links">
+        <a href="https://myperformanceproject.grafana.net/d/k6-perf-v3" class="obs-btn grafana" target="_blank">
+          📊 Grafana k6 Dashboard
+        </a>
+        <a href="https://myperformanceproject.grafana.net/explore" class="obs-btn loki" target="_blank">
+          🔍 Loki Explore
+        </a>
+        <span class="obs-btn" style="background:#e2e8f0;color:#4a5568;cursor:default;">
+          🎫 Azure DevOps Issue — SKIPPED (PASS verdict)
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RECOMMENDATIONS ═══════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-header">AI-Generated Recommendations</div>
+    <div class="card-body">
+      <ul class="reco-list">
+        <li>
+          <span class="icon">✅</span>
+          <div>
+            <strong>System is healthy.</strong> All thresholds passed with significant headroom.
+            p95 at 65ms is 87% below the 500ms p99 limit.
+          </div>
+        </li>
+        <li>
+          <span class="icon">🎯</span>
+          <div>
+            <strong>Investigate Checkout latency baseline.</strong> The Checkout Page (POST /api/orders)
+            is consistently the slowest transaction at p95=69ms vs Products Page at p95=57ms.
+            Profile the order-service DB query plan to confirm no N+1 patterns before increasing load.
+          </div>
+        </li>
+        <li>
+          <span class="icon">📈</span>
+          <div>
+            <strong>Increase VU count for next run.</strong> At 10 VUs the system shows excellent headroom.
+            Run the stress test (10→25→50→100 VUs) to find the actual breaking point:
+            <code>k6 run k6/scripts/stress-test.js</code>
+          </div>
+        </li>
+        <li>
+          <span class="icon">🔐</span>
+          <div>
+            <strong>Configure Grafana token for log correlation.</strong> Paste
+            <code>LOKI_PASSWORD=&lt;token&gt;</code> into <code>.env</code> to enable Loki queries
+            in the next pipeline run. This provides full error/warning context alongside k6 metrics.
+          </div>
+        </li>
+        <li>
+          <span class="icon">🔒</span>
+          <div>
+            <strong>Consider tightening thresholds.</strong> Current p99 threshold of 500ms is very
+            conservative for a system delivering p95=65ms. Tighten to 200ms to catch regressions
+            earlier: update <code>threshold_p99_ms</code> in the pipeline input.
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ══ TEST DATA INFO ════════════════════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-header">Test Data &amp; Configuration</div>
+    <div class="card-body">
+      <table>
+        <tbody>
+          <tr><td style="width:220px;color:#718096;font-weight:600;">Test Data File</td><td><code>k6/data/aks-regression-20260308-125725.csv</code></td></tr>
+          <tr><td style="color:#718096;font-weight:600;">Rows</td><td>50 customers (joined from order-db-aks, user-db-aks, product-db-aks)</td></tr>
+          <tr><td style="color:#718096;font-weight:600;">Validation</td><td>50 rows · 0 null emails · all product_ids present · all quantities &gt; 0 · all prices &gt; 0</td></tr>
+          <tr><td style="color:#718096;font-weight:600;">k6 Script</td><td><code>k6/scripts/baseline-test.js</code></td></tr>
+          <tr><td style="color:#718096;font-weight:600;">Results JSON</td><td><code>k6/results/aks-regression-20260308-125725.json</code></td></tr>
+          <tr><td style="color:#718096;font-weight:600;">Test Window</td><td>2026-03-08T13:02:34Z → 2026-03-08T13:07:55Z (5m 21s)</td></tr>
+          <tr><td style="color:#718096;font-weight:600;">Grafana Stream</td><td>⚠️ 401 — token not configured in .env</td></tr>
+          <tr><td style="color:#718096;font-weight:600;">MCP Servers</td><td>order-db-aks · user-db-aks · product-db-aks (via kubectl port-forward)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<footer>
+  Generated automatically by Claude Code — AI Performance Engineering Ecosystem &nbsp;|&nbsp;
+  2026-03-08T13:07:55Z &nbsp;|&nbsp;
+  Environment: AKS (Azure Kubernetes Service) &nbsp;|&nbsp;
+  Cluster: aks-perf-demo · northeurope
+</footer>
+
+</body>
+</html>
