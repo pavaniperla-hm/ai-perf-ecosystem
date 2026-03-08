@@ -21,7 +21,7 @@ The pipeline is driven by five specialised Claude Code agents:
 | `local` | `http://localhost:8080` | Jira (`SCRUM` project) |
 | `aks` | `http://20.82.174.115` | Azure DevOps |
 
-**Observability:** Grafana Cloud (Prometheus remote write + Loki log shipping). Dynatrace integration pending.
+**Observability:** Grafana Cloud (Prometheus remote write + Loki log shipping) + Dynatrace OneAgent (applicationMonitoring mode, injected into all perf-demo pods).
 
 ---
 
@@ -254,6 +254,44 @@ k8s/
 ├── deploy.sh
 └── build-and-push.sh   # ARM64 images via WSL2
 ```
+
+---
+
+## Dynatrace
+
+### Deployment
+- **Operator:** v1.8.1 installed via `https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml`
+- **Namespace:** `dynatrace`
+- **Mode:** `applicationMonitoring` (no DaemonSet — webhook injects CodeModules into pods at startup)
+- **Tenant:** `https://kun86120.live.dynatrace.com`
+- **Secret:** `dynakube` in `dynatrace` namespace (apiToken + paasToken)
+- **Manifest:** `k8s/dynatrace/dynakube.yaml`
+
+### Why applicationMonitoring (not cloudNativeFullStack)
+The AKS node pool is **ARM64**. The Dynatrace OneAgent container image (`linux/oneagent:1.331.49-raw`) is **amd64-only** — it fails with `exec format error` on ARM64. `applicationMonitoring` uses a webhook init-container that injects the agent into application pods and does not require a per-node DaemonSet.
+
+### Monitored namespaces
+The operator auto-labels namespaces. Currently injecting into: `default`, `ingress-nginx`, `perf-demo`.
+Verify: `kubectl get namespace perf-demo --show-labels` — look for `dynakube.internal.dynatrace.com/instance=dynakube`.
+
+### Verify injection
+```bash
+kubectl get pod -n perf-demo -o jsonpath='{.items[*].metadata.annotations.oneagent\.dynatrace\.com/injected}'
+# Should return: true true true ...
+```
+
+### Known token scope gaps
+- `activeGateTokenManagement.create` — required to enable ActiveGate (Kubernetes monitoring tab in DT UI). Add this scope to the API token in Dynatrace UI → Access Tokens, then uncomment the `activeGate` block in `k8s/dynatrace/dynakube.yaml`.
+- `settings.read` — optional; some UI features limited without it.
+
+### ActiveGate (pending)
+To enable Kubernetes cluster monitoring in Dynatrace UI:
+1. Add `activeGateTokenManagement.create` scope to the API token in Dynatrace UI
+2. Uncomment the `activeGate` block in `k8s/dynatrace/dynakube.yaml`
+3. `kubectl apply -f k8s/dynatrace/dynakube.yaml`
+
+### Webhook CPU
+The `dynatrace-webhook` default CPU request is 300m. Patched to 100m request / 300m limit to fit the single-node cluster (which runs at ~89% CPU requests). If the cluster is scaled up, the original 300m request can be restored.
 
 ---
 
