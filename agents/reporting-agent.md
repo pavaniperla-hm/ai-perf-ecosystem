@@ -61,6 +61,21 @@ log_summary:
   warning_count:     int
   affected_services: list[string]
   top_errors:        list[{timestamp, service, message}]
+dynatrace_analysis:
+  skipped:           bool
+  slowest_service:   string | null
+  slowest_service_ms: float | null
+  app_time_ms:       float | null
+  db_time_ms:        float | null
+  db_pct:            float | null
+  db_bottleneck:     bool | null
+  slow_endpoints:    list[string]
+  error_rate_pct:    float | null
+  problems:          list[{id, title, url}]
+  sample_trace_url:  string | null
+  service_url:       string | null
+  recommended_fix:   string | null
+  reason:            string | null
 metrics_summary:
   avg_ms, p90_ms, p95_ms, max_ms
   error_rate, checks_rate, total_requests, rps, iterations
@@ -199,6 +214,42 @@ Fill every section with real values from the inputs.
 
 ---
 
+## Root Cause Analysis (Dynatrace)
+
+<if dynatrace_analysis.skipped=true:>
+*Dynatrace deep-dive not available: <dynatrace_analysis.reason or "DYNATRACE_ENABLED=false for this environment">*
+
+<else:>
+| Finding | Value |
+|---|---|
+| Slowest service | <slowest_service> (<slowest_service_ms>ms avg) |
+| App processing time | <app_time_ms>ms (<app_time_ms/slowest_service_ms*100 rounded>%) |
+| Database wait time | <db_time_ms>ms (<db_pct>%) <if db_bottleneck: "⚠️ DB bottleneck"> |
+| DT error rate | <error_rate_pct>% |
+| Exceptions / Problems | <len(problems)> problems raised |
+
+**Time breakdown:**
+```
+App  [<bar proportional to app %>] <app_pct>%
+DB   [<bar proportional to db  %>] <db_pct>%
+```
+
+**Top slow endpoints:**
+<for each in slow_endpoints: "- <endpoint>">
+<if empty: "- No endpoint breakdown available">
+
+**Recommended fix:** <recommended_fix>
+
+<if problems non-empty:>
+**Problems raised:**
+<for each problem: "- [<id>](<url>) <title>">
+
+**Dynatrace links:**
+- [Service view](<service_url>)
+<if sample_trace_url:>- [Sample trace — slowest request](<sample_trace_url>)
+
+---
+
 ## Observability Links
 
 - [Grafana Dashboard (k6 metrics)](<GRAFANA_DASHBOARD_URL from .env.active>)
@@ -314,8 +365,10 @@ reason: "<error message>"
 - For Jira: use `JIRA_PROJECT` key from `.env.active` (never hardcode project key)
 - For Azure DevOps: read org/project/type from `.env.active`; always use REST API not MCP
 - Always use `GRAFANA_DASHBOARD_URL` from `.env.active` for Observability Links in tickets
-- Always include all four sections (Threshold Analysis, Full Metrics,
-  Per-Transaction, Log Evidence) even if some values are zero
+- Always include all five sections (Threshold Analysis, Full Metrics,
+  Per-Transaction, Log Evidence, Root Cause Analysis) even if some values are zero
 - If `log_summary` contains `error: "Loki data unavailable"`, write
   "Loki data was unavailable during this run" in the Log Evidence section
+- If `dynatrace_analysis.skipped=true`, write the reason in the Root Cause Analysis section
+  — do not omit the section entirely
 - Do not modify the next_steps list — render exactly what the Analysis Agent produced

@@ -259,6 +259,17 @@ k8s/
 
 ## Dynatrace
 
+### Credentials
+| Variable | Where stored | Notes |
+|---|---|---|
+| `DYNATRACE_URL` | `.env.aks` (committed) | `https://kun86120.live.dynatrace.com` |
+| `DYNATRACE_API_TOKEN` | `.env` (gitignored) | Full-scope token — see token name in DT UI |
+| `DYNATRACE_ENABLED` | `.env.aks` = `true`, `.env.local` = `false` | Controls analysis-agent deep-dive |
+| `DYNATRACE_NAMESPACE_FILTER` | `.env.aks` (committed) | `perf-demo` |
+
+Token is read by `analysis-agent.md` (Step 3 — Dynatrace Deep Dive) from `.env`.
+The same token is stored in the `dynakube` k8s secret (`apiToken` field) for operator auth.
+
 ### Deployment
 - **Operator:** v1.8.1 installed via `https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml`
 - **Namespace:** `dynatrace`
