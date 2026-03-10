@@ -8,17 +8,30 @@ metadata:
 spec:
   apiUrl: https://kun86120.live.dynatrace.com/api
   skipCertCheck: false
-  # cloudNativeFullStack OneAgent container image is amd64-only and cannot run
-  # on this ARM64 node pool. Using applicationMonitoring instead:
-  # - No per-node DaemonSet required
-  # - Dynatrace webhook injects CodeModules into application pods at startup
-  # - Works on ARM64 (injection happens into JVM/Go/Node process, not a separate container)
+  # cloudNativeFullStack schedules OneAgent on every node.
+  # Pinned to the amd64 monitoring node pool — ARM64 container images not available.
   oneAgent:
-    applicationMonitoring: {}
-  # activeGate requires 'activeGateTokenManagement.create' scope on the API token.
-  # Add that scope in Dynatrace UI → Access Tokens, then uncomment to enable:
-  # activeGate:
-  #   capabilities:
-  #     - routing
-  #     - kubernetes-monitoring
-  #     - dynatrace-api
+    cloudNativeFullStack:
+      nodeSelector:
+        nodepool: monitoring
+      tolerations:
+        - key: monitoring
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+  # ActiveGate pinned to the amd64 monitoring node pool.
+  activeGate:
+    capabilities:
+      - routing
+      - kubernetes-monitoring
+      - dynatrace-api
+    nodeSelector:
+      nodepool: monitoring
+    tolerations:
+      - key: monitoring
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
