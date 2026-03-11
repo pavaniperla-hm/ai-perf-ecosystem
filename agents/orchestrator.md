@@ -259,13 +259,105 @@ OUTPUT / NEXT INPUT:
 
 ## Orchestrator Behaviour
 
+### Demo-first execution model
+
+**Each pipeline stage must run as an isolated sub-agent using the `Agent` tool.**
+Never run agent logic inline in the orchestrator thread — all the noisy tool calls
+(file reads, curl, kubectl, k6) must stay inside the sub-agent's own context.
+
+The orchestrator's visible output is **only**:
+- Stage launch banners (before each Agent tool call)
+- Handoff summary cards (printed from the sub-agent's returned result)
+- The final pipeline summary
+
 ### On each agent call
-1. Print: `[ORCHESTRATOR] Starting <agent-name>...`
-2. Pass the correct input contract (see above)
-3. Wait for the agent to complete
-4. Print: `[ORCHESTRATOR] <agent-name> complete — <one-line status>`
-5. If the agent returns a failure, **stop the pipeline immediately** and go to
-   the Failure Report section below
+1. Print the stage launch banner (see format below)
+2. Call the `Agent` tool with `subagent_type=general-purpose`, passing a full
+   prompt that includes the agent's MD file path and its input contract
+3. When the sub-agent returns, print the handoff summary card
+4. If the sub-agent returns a failure status, **stop the pipeline immediately**
+
+### Stage launch banner format
+```
+╔══════════════════════════════════════════════════════╗
+║  STAGE <N> — <AGENT NAME>                            ║
+║  <one-line description of what this agent does>      ║
+╚══════════════════════════════════════════════════════╝
+```
+
+### Handoff summary card format (print after each stage completes)
+```
+┌─ ✅ <AGENT NAME> COMPLETE ──────────────────────────┐
+│  <key output 1>                                      │
+│  <key output 2>                                      │
+│  <key output 3>                                      │
+│  → Passing control to: <NEXT AGENT NAME>             │
+└──────────────────────────────────────────────────────┘
+```
+
+On failure:
+```
+┌─ ❌ <AGENT NAME> FAILED ────────────────────────────┐
+│  Reason: <error>                                     │
+│  Pipeline stopped. Fix the issue and re-run.         │
+└──────────────────────────────────────────────────────┘
+```
+
+### Example handoff cards
+
+After Health Check:
+```
+┌─ ✅ HEALTH CHECK COMPLETE ─────────────────────────┐
+│  Environment   : aks                                │
+│  Services      : 3/3 healthy (user, product, order) │
+│  Pods          : 8/8 Running                        │
+│  DB row counts : users=10,000 | products=5,000      │
+│                  orders=50,000                      │
+│  → Passing control to: DATA AGENT                   │
+└─────────────────────────────────────────────────────┘
+```
+
+After Data Agent:
+```
+┌─ ✅ DATA AGENT COMPLETE ───────────────────────────┐
+│  CSV file  : k6/data/test-data-checkout.csv         │
+│  Rows      : 500 (500 valid users, 500 products)    │
+│  Validated : 0 nulls, all emails valid              │
+│  → Passing control to: EXECUTION AGENT              │
+└─────────────────────────────────────────────────────┘
+```
+
+After Execution Agent:
+```
+┌─ ✅ EXECUTION AGENT COMPLETE ──────────────────────┐
+│  Script    : regression-test.js (4 scenarios)       │
+│  Duration  : 2 min | VUs: ramp to 20                │
+│  Requests  : 1,445 total | RPS: 11.78               │
+│  p95       : 181ms | avg: 78ms | errors: 0%         │
+│  → Passing control to: ANALYSIS AGENT               │
+└─────────────────────────────────────────────────────┘
+```
+
+After Analysis Agent:
+```
+┌─ ✅ ANALYSIS AGENT COMPLETE ───────────────────────┐
+│  Verdict     : ❌ FAIL                              │
+│  Breach      : p95=181ms exceeds 30ms threshold     │
+│  Loki errors : 0 errors, 0 warnings                 │
+│  Dynatrace   : product-service flagged as slowest   │
+│  Fix         : Recalibrate thresholds to p95<100ms  │
+│  → Passing control to: REPORTING AGENT              │
+└─────────────────────────────────────────────────────┘
+```
+
+After Reporting Agent:
+```
+┌─ ✅ REPORTING AGENT COMPLETE ──────────────────────┐
+│  Ticket  : ADO-9 (Azure DevOps)                     │
+│  Title   : [PERF] checkout-regression FAIL p95=181ms│
+│  Status  : Created ✅                               │
+└─────────────────────────────────────────────────────┘
+```
 
 ### On pipeline success (all agents complete)
 Print a final summary in this format:

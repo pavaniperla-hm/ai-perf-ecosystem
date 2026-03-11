@@ -447,3 +447,28 @@ Print to user:
 - Only run Dynatrace deep-dive when `DYNATRACE_ENABLED=true` AND `verdict=FAIL`
 - Never fail the pipeline due to a Dynatrace API error — set `skipped=true` with reason and continue
 - Do not create tickets — that is the Reporting Agent's responsibility
+
+---
+
+## Demo Return Contract
+
+When invoked as a sub-agent by the Orchestrator, **end your response with this exact block**:
+
+```
+AGENT_RESULT_START
+status: ANALYSIS_COMPLETE
+verdict: PASS | FAIL
+p99_threshold_ms: <int>
+p95_actual_ms: <float>
+p99_status: PASS | FAIL
+error_status: PASS | FAIL
+checks_status: PASS | FAIL
+loki_errors: <int>
+loki_warnings: <int>
+loki_affected_services: <comma-separated or "none">
+dt_skipped: true | false
+dt_slowest_service: <name or "n/a">
+dt_recommended_fix: <one-line string>
+next_steps: <one per line>
+AGENT_RESULT_END
+```

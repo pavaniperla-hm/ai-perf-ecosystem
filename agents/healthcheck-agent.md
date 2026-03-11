@@ -281,4 +281,29 @@ failed_checks: list[{service, check_type, error, fix_suggestion}]
 - Never proceed to the Data Agent if HEALTH_CHECK_FAILED
 - Always show the full results table, even on failure (show ✅ for passing checks and ❌ for failing)
 - Retry transient failures up to 3 times — never fail immediately on timeout or 503
+
+---
+
+## Demo Return Contract
+
+When invoked as a sub-agent by the Orchestrator, **end your response with this exact block**
+so the Orchestrator can display a clean handoff card without re-parsing your full output:
+
+```
+AGENT_RESULT_START
+status: HEALTH_CHECK_PASSED | HEALTH_CHECK_FAILED
+environment: <value>
+services_checked: <int>
+pods_healthy: <int>   # AKS only, else omit
+response_times:
+  user_service: <ms>
+  product_service: <ms>
+  order_service: <ms>
+db_row_counts:
+  user_db: <int>
+  product_db: <int>
+  order_db: <int>
+failed_checks: []   # list items if FAILED, else empty
+AGENT_RESULT_END
+```
 - Always include an actionable fix suggestion for every failed check

@@ -175,3 +175,19 @@ Failure: print `[DATA AGENT] FAILED: <reason>` and stop.
 - Log which environment, MCP servers, and row counts were used
 - If regeneration fails with `ECONNRESET`, the script is using `localhost` resolving to IPv6; ensure `generate-test-data.js` uses `127.0.0.1` not `localhost`
 - For AKS: start kubectl port-forwards BEFORE running the CSV generator
+
+---
+
+## Demo Return Contract
+
+When invoked as a sub-agent by the Orchestrator, **end your response with this exact block**:
+
+```
+AGENT_RESULT_START
+status: DATA_AGENT_COMPLETE | DATA_AGENT_FAILED
+file_path: <csv path>
+row_count: <int>
+validation_summary: <e.g. "500 rows, 0 nulls, all emails valid">
+scenario: <value>
+AGENT_RESULT_END
+```

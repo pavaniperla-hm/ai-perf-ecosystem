@@ -237,3 +237,30 @@ Pipeline cannot continue without test results.
 - Print k6 stdout in full so the user can follow progress
 - If Prometheus remote write returns 401 or 429, log a warning but do not
   fail — test results are still valid; prompt user to set token in `.env`
+
+---
+
+## Demo Return Contract
+
+When invoked as a sub-agent by the Orchestrator, **end your response with this exact block**:
+
+```
+AGENT_RESULT_START
+status: EXECUTION_COMPLETE | EXECUTION_FAILED
+script: <filename>
+duration: <e.g. "2m">
+vus: <int>
+total_requests: <int>
+rps: <float>
+avg_ms: <float>
+p90_ms: <float>
+p95_ms: <float>
+max_ms: <float>
+error_rate_pct: <float>
+checks_rate_pct: <float>
+start_time: <ISO8601>
+end_time: <ISO8601>
+results_file: <json path>
+html_report: <html path>
+AGENT_RESULT_END
+```
