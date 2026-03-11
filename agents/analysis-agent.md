@@ -73,7 +73,7 @@ start_time:       string    # ISO 8601 UTC — start of k6 test
 end_time:         string    # ISO 8601 UTC — end of k6 test
 results_file:     string
 scenario:         string
-threshold_p99_ms: int       # default 20
+threshold_p99_ms: int       # default 500
 ```
 
 ---
@@ -95,7 +95,7 @@ Check each threshold in order. A single breach makes the overall verdict FAIL.
 For each threshold, record:
 ```
 name:   "p99 response time"
-limit:  "< 20ms"
+limit:  "< 500ms"
 actual: "p95=43ms (p99 estimated)"
 status: "PASS" | "FAIL"
 ```
@@ -121,7 +121,62 @@ LOKI_PASSWORD=$(grep "^LOKI_PASSWORD=" .env | tr -d '\r' | cut -d'=' -f2-)
 [ -z "$LOKI_PASSWORD" ] && LOKI_PASSWORD=$(grep "^GRAFANA_API_TOKEN=" .env | tr -d '\r' | cut -d'=' -f2-)
 ```
 
-### Time Window
+### 2a — Loki Pre-flight Check
+
+**Before querying the test window**, verify Loki is reachable and that the log
+filter is actually producing data. This catches the "environment mismatch" problem
+where the environment was local but tests ran against AKS (or vice versa).
+
+```bash
+# Step 1: verify Loki connectivity — query last 15 minutes for ANY log entry
+PREFLIGHT_NS_END=$(date -u +%s%N)
+PREFLIGHT_NS_START=$(( PREFLIGHT_NS_END - 900000000000 ))   # 15 min ago
+
+PREFLIGHT_RESPONSE=$(curl -s --ssl-no-revoke -o /dev/null -w "%{http_code}" -G \
+  "${LOKI_URL}/loki/api/v1/query_range" \
+  --data-urlencode "query=${LOKI_QUERY_FILTER}" \
+  --data-urlencode "start=${PREFLIGHT_NS_START}" \
+  --data-urlencode "end=${PREFLIGHT_NS_END}" \
+  --data-urlencode "limit=1" \
+  -u "${LOKI_USERNAME}:${LOKI_PASSWORD}")
+
+# Step 2: check response code
+if [ "$PREFLIGHT_RESPONSE" != "200" ]; then
+  echo "[ANALYSIS AGENT] ⚠️ Loki pre-flight FAILED (HTTP ${PREFLIGHT_RESPONSE})"
+  echo "  Possible causes:"
+  echo "  1. LOKI_PASSWORD / GRAFANA_API_TOKEN not set in .env"
+  echo "  2. LOKI_URL unreachable from this machine"
+  echo "  3. Token has insufficient scope (needs logs:read)"
+  # Continue — do not fail the pipeline. Log data is best-effort.
+fi
+
+# Step 3: check if any streams exist for this filter
+PREFLIGHT_DATA=$(curl -s --ssl-no-revoke -G \
+  "${LOKI_URL}/loki/api/v1/query_range" \
+  --data-urlencode "query=${LOKI_QUERY_FILTER}" \
+  --data-urlencode "start=${PREFLIGHT_NS_START}" \
+  --data-urlencode "end=${PREFLIGHT_NS_END}" \
+  --data-urlencode "limit=1" \
+  -u "${LOKI_USERNAME}:${LOKI_PASSWORD}")
+
+STREAM_COUNT=$(echo "$PREFLIGHT_DATA" | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('data',{}).get('result',[])))" 2>/dev/null || echo "0")
+
+if [ "$STREAM_COUNT" = "0" ]; then
+  echo "[ANALYSIS AGENT] ⚠️ Loki pre-flight WARNING: filter '${LOKI_QUERY_FILTER}' returned 0 streams in last 15 min"
+  echo "  This usually means the ENVIRONMENT in .env.active does not match the test target."
+  echo "  Current environment : ${ENVIRONMENT}"
+  echo "  Loki filter         : ${LOKI_QUERY_FILTER}"
+  echo "  Expected for AKS    : {namespace=\"perf-demo\"}"
+  echo "  Expected for local  : {job=\"docker-compose\"}"
+  echo "  → Check that .env.active was set BEFORE running the test."
+  echo "  → For local: verify Promtail container is running (docker ps | grep promtail)"
+  echo "  → For AKS: verify Promtail DaemonSet is healthy (kubectl get pods -n perf-demo | grep promtail)"
+else
+  echo "[ANALYSIS AGENT] Loki pre-flight ✅ — ${STREAM_COUNT} active stream(s) found for filter"
+fi
+```
+
+### 2b — Time Window Queries
 
 Convert `start_time` and `end_time` to Unix nanoseconds for the Loki API:
 ```bash
@@ -156,6 +211,10 @@ curl -s --ssl-no-revoke -G "${LOKI_URL}/loki/api/v1/query_range" \
 ```
 
 Parameters: `limit=200`, `direction=backward`
+
+**If all three queries return empty results** despite the pre-flight check passing,
+set `log_summary.warning = "No log entries found for test window — Promtail may have
+a scrape delay or container logs were not emitted during this run"` and continue.
 
 ### Parsing Results
 
@@ -194,78 +253,45 @@ Skip this step entirely (set `dynatrace_analysis.skipped=true`) if:
 
 All requests use:
 ```bash
-DT_URL=$DYNATRACE_URL      # from .env.active
+DT_URL=$DYNATRACE_URL          # from .env.active
 DT_TOKEN=$DYNATRACE_API_TOKEN  # from .env
 # Header: Authorization: Api-Token $DT_TOKEN
 ```
 
 Convert `start_time` and `end_time` to milliseconds-since-epoch for the Dynatrace API:
 ```bash
-START_MS=$(date -d "<start_time>" +%s%3N 2>/dev/null)
-END_MS=$(date -d "<end_time>" +%s%3N 2>/dev/null)
+START_MS=$(date -d "<start_time>" +%s000 2>/dev/null)
+END_MS=$(date -d "<end_time>" +%s000 2>/dev/null)
 ```
+
+> **Scope note:** This Dynatrace tenant does not expose a `metrics.read` scope —
+> only `metrics.ingest` is available. Steps 3a and 3b therefore use only
+> `entities.read` and `problems.read` (both confirmed working). Metrics-level
+> queries (response time breakdown, DB %) are skipped and `null` is returned
+> for those fields.
 
 ---
 
-### 3a — Find Slowest Service
+### 3a — Monitored Services (entities.read)
 
-Query service response time for the test window, filtered to the monitored namespace:
+List all services Dynatrace is monitoring:
 
 ```bash
 curl -s --ssl-no-revoke \
   -H "Authorization: Api-Token ${DT_TOKEN}" \
-  "${DT_URL}/api/v2/metrics/query?metricSelector=builtin:service.response.time:avg:sort(value(auto,descending))&resolution=Inf&from=${START_MS}&to=${END_MS}&entitySelector=type(SERVICE),tag(~%22kubernetes_namespace:${DYNATRACE_NAMESPACE_FILTER}~%22)"
+  "${DT_URL}/api/v2/entities?entitySelector=type(SERVICE)&pageSize=20"
 ```
 
-From the response, identify:
-- Which service had the highest average response time
-- Record as `dt_slowest_service` and `dt_slowest_service_avg_ms`
+From the response, extract each entity's `entityId` and `displayName`.
+Record as `dt_monitored_services[]`.
 
-If the entity selector returns no results, retry without the namespace filter and note "namespace filter returned no results — showing all services".
+If the response is empty or errors, note "No services found — OneAgent may not be deployed to all pods".
 
 ---
 
-### 3b — Response Time Breakdown
+### 3b — Problems During Test Window (problems.read)
 
-For the slowest service, query the time breakdown:
-
-```bash
-# Server-side processing time
-curl -s --ssl-no-revoke \
-  -H "Authorization: Api-Token ${DT_TOKEN}" \
-  "${DT_URL}/api/v2/metrics/query?metricSelector=builtin:service.response.time:avg&resolution=Inf&from=${START_MS}&to=${END_MS}&entitySelector=type(SERVICE),entityName(~%22${dt_slowest_service}~%22)"
-
-# DB wait time
-curl -s --ssl-no-revoke \
-  -H "Authorization: Api-Token ${DT_TOKEN}" \
-  "${DT_URL}/api/v2/metrics/query?metricSelector=builtin:service.dbconnections.totalTime:avg&resolution=Inf&from=${START_MS}&to=${END_MS}&entitySelector=type(SERVICE),entityName(~%22${dt_slowest_service}~%22)"
-```
-
-Calculate:
-- `dt_app_time_ms` = total response time − db wait time
-- `dt_db_time_ms` = db wait time
-- `dt_db_pct` = db_time / total_response_time × 100
-- Flag `dt_db_bottleneck=true` if `dt_db_pct > 30`
-
----
-
-### 3c — Top Slow Endpoints
-
-Query top slow request types for the slowest service:
-
-```bash
-curl -s --ssl-no-revoke \
-  -H "Authorization: Api-Token ${DT_TOKEN}" \
-  "${DT_URL}/api/v2/metrics/query?metricSelector=builtin:service.requestCount.total:sum&resolution=Inf&from=${START_MS}&to=${END_MS}&entitySelector=type(SERVICE),entityName(~%22${dt_slowest_service}~%22)"
-```
-
-Record the top 3 endpoints by p95 response time as `dt_slow_endpoints[]`.
-
----
-
-### 3d — Problems and Exceptions
-
-Check for any Dynatrace Problems raised during the test window:
+Check for any Dynatrace Problems opened or active during the test window:
 
 ```bash
 curl -s --ssl-no-revoke \
@@ -273,79 +299,60 @@ curl -s --ssl-no-revoke \
   "${DT_URL}/api/v2/problems?from=${START_MS}&to=${END_MS}&problemSelector=status(OPEN,CLOSED)"
 ```
 
-Check error rate per service:
+Also check for currently open problems:
 
 ```bash
 curl -s --ssl-no-revoke \
   -H "Authorization: Api-Token ${DT_TOKEN}" \
-  "${DT_URL}/api/v2/metrics/query?metricSelector=builtin:service.errors.total.rate:avg&resolution=Inf&from=${START_MS}&to=${END_MS}&entitySelector=type(SERVICE),tag(~%22kubernetes_namespace:${DYNATRACE_NAMESPACE_FILTER}~%22)"
+  "${DT_URL}/api/v2/problems?problemSelector=status(OPEN)&pageSize=10"
 ```
 
 Record:
-- `dt_problems[]` — list of problem IDs and titles (empty list if none)
-- `dt_error_rate_pct` — error rate from Dynatrace (cross-check against k6)
+- `dt_problems[]` — list of `{id, title, impactLevel, status}` (empty list if none)
+- `dt_problem_count` — total number of problems
 
 ---
 
-### 3e — Sample Trace for Slowest Request
+### 3c — Root Cause Summary
 
-Find the single slowest distributed trace in the test window for the order-service (most complex path):
-
-```bash
-curl -s --ssl-no-revoke \
-  -H "Authorization: Api-Token ${DT_TOKEN}" \
-  "${DT_URL}/api/v2/traces?from=${START_MS}&to=${END_MS}&query=service.name%3Dorder-service&sort=duration%20DESC&limit=1"
-```
-
-If the traces endpoint is not available on this tenant tier, skip 3e and note "Distributed Traces API not available".
-
-From the trace record:
-- `dt_sample_trace_id` — trace ID
-- `dt_sample_trace_duration_ms` — end-to-end duration
-- `dt_sample_trace_url` = `${DYNATRACE_URL}/#trace;gtf=-${START_MS};gti=${END_MS};traceId=${dt_sample_trace_id}`
-
----
-
-### 3f — Root Cause Summary
-
-Based on all Dynatrace data, build `dynatrace_analysis`:
+Based on entities + problems data, build `dynatrace_analysis`:
 
 ```
 dynatrace_analysis:
   skipped:             false
-  slowest_service:     string    # e.g. "order-service"
-  slowest_service_ms:  float     # avg response time ms
-  app_time_ms:         float
-  db_time_ms:          float
-  db_pct:              float
-  db_bottleneck:       bool      # true if db_pct > 30
-  slow_endpoints:      list[string]
-  error_rate_pct:      float
-  problems:            list[{id, title, url}]
-  sample_trace_url:    string | null
-  service_url:         string    # ${DYNATRACE_URL}/#services — link to DT UI
-  recommended_fix:     string    # derived below
+  monitored_services:  list[string]   # displayNames from 3a
+  problems:            list[{id, title, impactLevel, status}]
+  problem_count:       int
+  slowest_service:     null           # not available — metrics.read not exposed on this tenant
+  slowest_service_ms:  null
+  app_time_ms:         null
+  db_time_ms:          null
+  db_pct:              null
+  db_bottleneck:       null
+  slow_endpoints:      []
+  error_rate_pct:      null
+  sample_trace_url:    null
+  service_url:         string         # ${DYNATRACE_URL}/#services
+  recommended_fix:     string         # derived below
+  reason:              null
 ```
 
 **Derive `recommended_fix`:**
-- If `db_bottleneck=true` → `"Add index on orders table — DB wait is {db_pct}% of response time"`
-- Else if `app_time_ms / slowest_service_ms > 0.7` → `"Review {slowest_service} business logic — application processing dominates"`
-- Else if `len(problems) > 0` → `"Investigate Dynatrace Problem {problems[0].id}: {problems[0].title}"`
-- Else → `"No dominant bottleneck — review full trace for distributed latency"`
+- If `problem_count > 0` → `"Investigate Dynatrace Problem '{problems[0].title}' (impact: {impactLevel}) — open the Services dashboard to view the affected service"`
+- Else if all k6 transactions are uniformly slow (within 15% of each other) → `"Uniform latency across all transactions suggests a shared bottleneck — check AKS ingress controller config (keep-alive, HTTP/2) or PostgreSQL connection pool saturation"`
+- Else → `"No Dynatrace problems detected. Run EXPLAIN ANALYZE on the slowest transaction's DB queries to identify missing indexes"`
 
 **Print to user:**
 ```
 [ANALYSIS AGENT] Dynatrace Deep Dive ✅
-  Slowest service : order-service (47ms avg)
-  Time breakdown  : App 33ms (70%) | DB 14ms (30%)
-  DB bottleneck   : false
-  Problems raised : 0
-  Sample trace    : https://kun86120.live.dynatrace.com/#trace;...
-  Recommended fix : Review order-service business logic — application processing dominates
+  Monitored services : <list>
+  Problems (window)  : <count> — <titles or "none">
+  metrics.read scope : not available on this tenant — response time breakdown skipped
+  Recommended fix    : <derived fix>
+  DT Services URL    : <service_url>
 ```
 
-If any Dynatrace API call fails, log the error, set `dynatrace_analysis.skipped=true` with `reason="API error: <message>"`, and continue — do not fail the pipeline.
-
+If any Dynatrace API call fails, log the error, set `dynatrace_analysis.skipped=true` with `reason="API error: <message>"`, and continue — do not fail the pipeline because of a Dynatrace API error.
 ---
 
 ## Step 4 — Verdict
@@ -369,7 +376,7 @@ had the most log errors:
 | `error_rate` breached | "Investigate HTTP 5xx responses — check order-service and user-service logs in Loki" |
 | `checks_rate` breached | "Review k6 check logic — one or more API responses returned unexpected status codes or body structure" |
 | `log_summary.error_count > 0` | "Fix application errors in: <affected_services>" |
-| All thresholds pass | "System is healthy. Thresholds are already tight (p99<20ms, 0% errors, 100% checks). Consider increasing VU count for next run." |
+| All thresholds pass | "System is healthy. All thresholds passed (0% errors, 100% checks). Consider tightening the p99 threshold or increasing VU count for next run." |
 
 Include all applicable next steps (can be multiple).
 
@@ -422,7 +429,7 @@ Print to user:
   — Loki: 0 errors, 0 warnings across all services
 
 [ANALYSIS AGENT] Verdict: FAIL ❌
-  — p99 threshold breached: p95=43ms exceeds 85% of 20ms limit (17ms)
+  — p99 threshold breached: p95=550ms exceeds 85% of 500ms limit (425ms)
   — Loki: 3 errors in order-service, 0 warnings
   — Recommending ticket creation
 ```

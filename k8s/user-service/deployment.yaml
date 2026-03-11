@@ -26,6 +26,12 @@ spec:
                 secretKeyRef:
                   name: db-secrets
                   key: USER_DB_URL
+            - name: PYTHONPATH
+              value: /opt/dynatrace/oneagent-paas/agent/bin/current/any/python/_oneagentpython/sitedir
+            - name: DT_LOGLEVELCON
+              value: debug
+            - name: DT_ONEAGENT_PYTHON_FORCE_SENSORS
+              value: "Python.inweb.fastapi(entrypoint=true),Python.inweb.starlette(entrypoint=true),Python.outweb.requests,Python.db.psycopg2"
           readinessProbe:
             httpGet:
               path: /health

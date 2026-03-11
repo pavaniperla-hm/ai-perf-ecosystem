@@ -6,6 +6,41 @@ from each as inputs to the next, and producing a final summary of the full cycle
 
 ---
 
+## Step -1 — Environment Switching (parse the prompt first)
+
+Before anything else, check if the user's prompt contains an environment switch directive.
+
+**Switch patterns to recognise (case-insensitive):**
+- `"switch to aks"` / `"use aks"` / `"run on aks"` / `"aks environment"`
+- `"switch to local"` / `"use local"` / `"run locally"` / `"local environment"`
+
+**If a switch is requested**, run the appropriate script **before** reading `.env.active`:
+
+```powershell
+# PowerShell (Windows — preferred)
+.\scripts\switch-env.ps1 -env aks     # or: local
+```
+```bash
+# Bash / WSL2 fallback
+./scripts/switch-env.sh aks           # or: local
+```
+
+Log the switch:
+```
+[ORCHESTRATOR] Environment switch requested → running switch-env to <env>
+[ORCHESTRATOR] Switch complete — .env.active updated
+```
+
+If the switch script fails, **stop immediately**:
+```
+[ORCHESTRATOR] FAILED: environment switch to <env> failed.
+Check that scripts/switch-env.ps1 exists and is executable.
+```
+
+If no switch is requested, skip this step silently.
+
+---
+
 ## Step 0 — Environment Bootstrap
 
 **Before doing anything else**, read and load the active environment configuration.
@@ -52,15 +87,26 @@ Run: .\scripts\switch-env.ps1 -env local   (or aks)
 You receive a **scenario name** in plain English, for example:
 
 ```
+"regression"
 "checkout regression"
-"login load spike"
-"product browse baseline"
+"baseline"
+"stress"
+"realistic"
 ```
 
-You must also accept optional overrides:
+**Default scenario when none is specified:** `"regression"` → runs `k6/scripts/regression-test.js`
+(4 realistic weighted scenarios, ramp to 20 VUs, 2 minutes total, tight p95<30ms thresholds).
+
+You must also accept optional overrides (only apply to `baseline-test.js`; ignored for scripts
+with baked-in `scenarios:` blocks):
 - `vus` — virtual user count (default: 10)
-- `duration` — test duration (default: `5m`)
-- `threshold_p99_ms` — p99 breach threshold in ms (default: 20)
+- `duration` — test duration (default: `2m`)
+- `threshold_p99_ms` — p99 breach threshold in ms (default: 500)
+
+> **Maximum test duration:** Never run a test longer than 2 minutes unless the user explicitly
+> requests a longer duration. The default regression-test.js and baseline-test.js both complete
+> within 2 minutes. `stress-test.js`, `peak-load-test.js`, and `realistic-load-test.js` run
+> longer — only use them when the user explicitly names the scenario.
 
 ---
 
@@ -72,6 +118,10 @@ current one fails. Each agent's output becomes the next agent's input.
 ```
   [Scenario Input]
         │
+        ▼  (Step -1: switch env if prompt says "Switch to AKS/local")
+        │
+        ▼  (Step 0: read .env.active → log environment)
+        │
         ▼
   ┌───────────────────┐
   │  HEALTH CHECK     │  → validates all services, pods, and DBs are healthy
@@ -81,22 +131,22 @@ current one fails. Each agent's output becomes the next agent's input.
          │ HEALTH_CHECK_FAILED → stop immediately
          ▼
   ┌─────────────┐
-  │  DATA AGENT │  → extracts test data from PostgreSQL
+  │  DATA AGENT │  → regenerates CSV from live DBs (always, every run)
   └──────┬──────┘
          │ file_path, row_count, validation_summary
          ▼
   ┌───────────────────┐
-  │  EXECUTION AGENT  │  → runs k6 test
+  │  EXECUTION AGENT  │  → smoke-tests URL, validates CSV env, runs k6
   └──────────┬────────┘
              │ metrics_summary, start_time, end_time, results_file
              ▼
   ┌────────────────┐
-  │ ANALYSIS AGENT │  → correlates metrics + Loki logs → verdict
+  │ ANALYSIS AGENT │  → thresholds + Loki logs + Dynatrace deep-dive → verdict
   └───────┬────────┘
-          │ threshold_results, log_summary, verdict, next_steps
+          │ threshold_results, log_summary, dynatrace_analysis, verdict, next_steps
           ▼
   ┌──────────────────┐
-  │ REPORTING AGENT  │  → creates ticket if verdict=FAIL
+  │ REPORTING AGENT  │  → deduplicates + creates ticket if verdict=FAIL
   └──────────────────┘     (Jira if BUG_TRACKER=jira,
           │                 Azure DevOps if BUG_TRACKER=azure-devops)
           │ ticket_key (or SKIPPED if PASS)
@@ -183,6 +233,21 @@ OUTPUT / NEXT INPUT:
     warning_count: int
     affected_services: list[string]
     top_errors: list[{timestamp, service, message}]
+  dynatrace_analysis:
+    skipped: bool
+    slowest_service: string | null
+    slowest_service_ms: float | null
+    app_time_ms: float | null
+    db_time_ms: float | null
+    db_pct: float | null
+    db_bottleneck: bool | null
+    slow_endpoints: list[string]
+    error_rate_pct: float | null
+    problems: list[{id, title, url}]
+    sample_trace_url: string | null
+    service_url: string | null
+    recommended_fix: string | null
+    reason: string | null
   metrics_summary: (passed through from execution agent)
   next_steps: list[string]
   scenario: string
@@ -234,6 +299,11 @@ Print a final summary in this format:
 
  VERDICT     : PASS ✅  |  FAIL ❌
  Ticket      : <ticket_key> (<tracker>) | SKIPPED (all thresholds passed)
+
+ REPORTS
+ ───────
+ HTML report : <html_report>
+ CSV summary : <csv_summary>
 ══════════════════════════════════════════════════════
 ```
 
@@ -268,6 +338,7 @@ Print a final summary in this format:
 
 ## Rules
 
+- Always check for an environment switch directive in the prompt (Step -1) before reading `.env.active`
 - Always complete Step 0 before starting any agent
 - Always run the Health Check Agent first — never start Data Agent if health check failed
 - Never skip an agent or re-order them

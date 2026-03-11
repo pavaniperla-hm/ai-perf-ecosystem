@@ -8,20 +8,11 @@ metadata:
 spec:
   apiUrl: https://kun86120.live.dynatrace.com/api
   skipCertCheck: false
-  # cloudNativeFullStack schedules OneAgent on every node.
-  # Pinned to the amd64 monitoring node pool — ARM64 container images not available.
+  # applicationMonitoring injects code modules via CSI driver (no DaemonSet needed).
+  # This works on ARM64 nodepool1 where the full OneAgent DaemonSet cannot run.
+  # Code modules communicate directly to the ActiveGate — no local socket dependency.
   oneAgent:
-    cloudNativeFullStack:
-      nodeSelector:
-        nodepool: monitoring
-      tolerations:
-        - key: monitoring
-          operator: Equal
-          value: "true"
-          effect: NoSchedule
-        - effect: NoSchedule
-          key: node-role.kubernetes.io/master
-          operator: Exists
+    applicationMonitoring: {}
   # ActiveGate pinned to the amd64 monitoring node pool.
   activeGate:
     capabilities:

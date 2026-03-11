@@ -58,16 +58,22 @@ threshold_p99_ms: int # passed through to analysis agent (default: 500)
 
 Map the scenario to the correct k6 script:
 
-| Scenario contains | Script |
-|---|---|
-| "checkout" | `k6/scripts/baseline-test.js` |
-| "login" | `k6/scripts/baseline-test.js` |
-| "products" or "browse" | `k6/scripts/baseline-test.js` |
-| "peak" | `k6/scripts/peak-load-test.js` |
-| "stress" | `k6/scripts/stress-test.js` |
-| "realistic" | `k6/scripts/realistic-load-test.js` |
+| Scenario contains | Script | Duration |
+|---|---|---|
+| "regression" | `k6/scripts/regression-test.js` | **2 min** — 4 scenarios, ramp to 20 VUs, tight thresholds |
+| "baseline" | `k6/scripts/baseline-test.js` | 2 min — 10 VUs steady, tight thresholds |
+| "checkout" | `k6/scripts/regression-test.js` | 2 min |
+| "login" | `k6/scripts/regression-test.js` | 2 min |
+| "products" or "browse" | `k6/scripts/regression-test.js` | 2 min |
+| "realistic" | `k6/scripts/realistic-load-test.js` | 13 min |
+| "peak" | `k6/scripts/peak-load-test.js` | ~15 min |
+| "stress" | `k6/scripts/stress-test.js` | ~20 min |
 
-Default to `k6/scripts/baseline-test.js` if no match.
+**Default: `k6/scripts/regression-test.js`** — used when no specific scenario keyword matches.
+
+> Scripts with fixed `scenarios:` blocks (regression, realistic, peak, stress) ignore the `vus`
+> and `duration` inputs — their ramp profiles are baked into the script. The `vus` / `duration`
+> inputs are only honoured by `baseline-test.js` which uses the simple `vus` / `duration` options.
 
 ---
 
@@ -86,11 +92,33 @@ Before running k6:
    ```
    Fail if k6 is not found.
 
-3. **Verify the test script exists** at the mapped path. Fail if not found.
+3. **Smoke-test the target URL** — confirm the k6 target is reachable before running the full test:
+   ```bash
+   curl -s -o /dev/null -w "%{http_code}" "${K6_BASE_URL}/api/products" --max-time 10
+   ```
+   If the HTTP status is not 200 or the request times out, **fail immediately** with:
+   ```
+   [EXECUTION AGENT] FAILED: target URL <K6_BASE_URL> is not reachable (status: <code>).
+   Check that the stack is running and port-forwards are active (AKS), then retry.
+   ```
 
-4. **Verify the CSV file exists** at `file_path`. Fail if not found.
+4. **Verify the test script exists** at the mapped path. Fail if not found.
 
-5. **Record start timestamp** in ISO 8601 UTC format before running:
+5. **Verify the CSV file exists** at `file_path`. Fail if not found.
+
+6. **CSV environment check** — confirm the CSV was generated for the current environment.
+   Read the first data row of the CSV and extract `customer_email`. Then verify a user with
+   that email exists in the active environment's database via MCP:
+   - Local: query `user-db` MCP server
+   - AKS: query `user-db-aks` MCP server
+   If the user is not found, **fail immediately** with:
+   ```
+   [EXECUTION AGENT] FAILED: CSV was generated for a different environment.
+   The email in row 1 does not exist in the <ENVIRONMENT> database.
+   Re-run the Data Agent to regenerate the CSV for the current environment.
+   ```
+
+7. **Record start timestamp** in ISO 8601 UTC format before running:
    ```bash
    date -u +"%Y-%m-%dT%H:%M:%SZ"
    ```
@@ -99,12 +127,14 @@ Before running k6:
 
 ## Run Command
 
+Use the script selected from the **Script Selection** table above (not a hardcoded path).
+
 ```bash
 set -a && source <(tr -d '\r' < .env.active) && source <(tr -d '\r' < .env) && set +a && \
 "C:\Program Files\k6\k6.exe" run \
   --out experimental-prometheus-rw \
   --summary-export k6/results/<scenario-slug>-<timestamp>.json \
-  k6/scripts/baseline-test.js
+  <SELECTED_SCRIPT>
 ```
 
 Where:

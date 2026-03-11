@@ -165,10 +165,11 @@ k6/
 ├── data/
 │   └── test-data-checkout.csv # 500 rows — regenerate when switching envs!
 ├── scripts/
+│   ├── regression-test.js     # DEFAULT — 4 scenarios, ramp to 20 VUs, 2 min, p95<30ms
 │   ├── baseline-test.js       # 10 VUs, 2 min — tight thresholds (p95<20ms)
-│   ├── stress-test.js         # Stepped ramp 10→25→50→100 VUs
-│   ├── peak-load-test.js      # Ramp to 50 VUs, hold 5 min
-│   ├── realistic-load-test.js # 4 weighted scenarios
+│   ├── stress-test.js         # Stepped ramp 10→25→50→100 VUs (~20 min)
+│   ├── peak-load-test.js      # Ramp to 50 VUs, hold 5 min (~15 min)
+│   ├── realistic-load-test.js # 4 weighted scenarios, full ramp/hold (13 min)
 │   └── generate-test-data.js  # Regenerates CSV from any env
 └── results/
     └── *.html / *.json        # Auto-generated reports
@@ -176,19 +177,23 @@ k6/
 
 ### Running k6 manually
 ```bash
-# With Grafana output (requires .env loaded)
+# Default regression test (2 min, 4 scenarios, ramp to 20 VUs)
+k6 run --out experimental-prometheus-rw k6/scripts/regression-test.js
+
+# Baseline steady-state test
 k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
 
-# Target local Docker
-TARGET_ENV=local k6 run --out experimental-prometheus-rw k6/scripts/baseline-test.js
+# Target local Docker instead of AKS
+TARGET_ENV=local k6 run --out experimental-prometheus-rw k6/scripts/regression-test.js
 ```
 
-### Current thresholds (baseline-test.js) — intentionally tight to trigger regression
-```
-http_req_duration: p(95)<20ms
-errors:            rate==0
-checks:            rate==1.0
-```
+### Thresholds — intentionally tight to always trigger regression on real network
+| Script | Threshold | Comment |
+|---|---|---|
+| `regression-test.js` | `p(95)<30ms` per transaction | AKS actual ~50ms → always FAIL |
+| `baseline-test.js` | `p(95)<20ms` overall | AKS actual ~52ms → always FAIL |
+| `realistic-load-test.js` | `p(95)<1000-2000ms` | Realistic — may PASS on AKS |
+| `stress-test.js` / `peak-load-test.js` | `p(95)<1500ms` | May PASS at lower VUs |
 
 ### Baseline results (AKS, 2026-03-06, original 1500ms thresholds)
 | Transaction | p(95) |
@@ -273,7 +278,7 @@ The same token is stored in the `dynakube` k8s secret (`apiToken` field) for ope
 ### Deployment
 - **Operator:** v1.8.1 installed via `https://github.com/Dynatrace/dynatrace-operator/releases/latest/download/kubernetes.yaml`
 - **Namespace:** `dynatrace`
-- **Mode:** `cloudNativeFullStack` + `activeGate` (full stack — OneAgent DaemonSet + ActiveGate)
+- **Mode:** `applicationMonitoring` + `activeGate` — code modules injected via init container (CSI-less). No OneAgent DaemonSet. Works on ARM64 nodepool1 where a full DaemonSet cannot run.
 - **Tenant:** `https://kun86120.live.dynatrace.com`
 - **Secret:** `dynakube` in `dynatrace` namespace (apiToken + paasToken)
 - **Manifest:** `k8s/dynatrace/dynakube.yaml`
@@ -281,10 +286,10 @@ The same token is stored in the `dynakube` k8s secret (`apiToken` field) for ope
 ### Pod status (all Running)
 ```
 dynakube-activegate-0      1/1 Running  aks-monitoring (amd64)
-dynakube-oneagent-*        1/1 Running  aks-monitoring (amd64)
 dynatrace-operator         1/1 Running  aks-nodepool1  (arm64)
 dynatrace-webhook          1/1 Running  aks-nodepool1  (arm64)
 ```
+Note: No `dynakube-oneagent-*` DaemonSet — `applicationMonitoring` mode uses an init container (`dynatrace-operator`) injected per pod instead.
 
 ### Node pool architecture
 OneAgent and ActiveGate container images are **amd64-only**. The main app node pool (`nodepool1`) is ARM64. A dedicated amd64 node pool was added to host Dynatrace components:
@@ -354,3 +359,19 @@ When creating AKS secrets, strip CRLF with `tr -d '\r'` to avoid silent token co
 ### 6. Windows CRLF in shell scripts
 Git on Windows converts LF→CRLF. Shell scripts baked into Docker images get `exec format error` on Linux.
 **Fix:** `.gitattributes` enforces `eol=lf` for all `.sh`, `.py`, `Dockerfile` files.
+
+### 7. Dynatrace Python sitecustomize `KeyError: 'sitecustomize'` — harmless
+**Symptom:** Pod startup logs show:
+```
+Error in sitecustomize; set PYTHONVERBOSE for traceback:
+KeyError: 'sitecustomize'
+```
+**Cause:** DT's `sitecustomize.py` calls `__import__("sitecustomize")` to chain to the next sitecustomize in Python's path. When none exists, Python's `site.py` catches the resulting `KeyError` and prints this warning.
+**Impact:** None. `_load_agent()` runs and completes successfully *before* the chaining step. The C-level agent reaches `LifeCycleState.RUNNING` and Python sensors (FastAPI, psycopg2) are active. Confirmed: DT entities API shows `User Service` and `Order Service` as monitored services.
+**Action:** No fix needed — safe to ignore this log line.
+
+### 8. Dynatrace `dt_slowest_ms` / `dt_db_pct` always null — token scope limitation
+**Symptom:** Analysis CSV shows `dt_slowest_ms=` (empty), `dt_db_pct=null`, `dt_db_bottleneck=false` even though DT is actively monitoring all services.
+**Cause:** The DT API token has `metrics.ingest` scope only — `metrics.read` is not granted. The analysis agent therefore skips all metrics-level queries (response time breakdown, DB time %) and returns null for those fields.
+**Impact:** DT can still detect monitored entities and open problems. Service-level timing data is unavailable via the analysis agent.
+**Fix:** To populate these fields, create a new DT API token with `metrics.read` scope added, update `DYNATRACE_API_TOKEN` in `.env`, and update the `dynakube` k8s secret accordingly.

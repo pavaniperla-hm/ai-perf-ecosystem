@@ -1,0 +1,2 @@
+date,scenario,environment,verdict,avg_ms,p90_ms,p95_ms,max_ms,error_rate_pct,checks_rate_pct,total_requests,rps,iterations,p99_threshold_ms,p99_status,error_status,checks_status,loki_errors,loki_warnings,loki_affected_services,dt_skipped,dt_slowest_service,dt_slowest_ms,dt_db_pct,dt_db_bottleneck,dt_recommended_fix,ticket_key
+2026-03-11,checkout-regression,aks,FAIL,78.54,132.07,181.42,795.63,0.00,100.00,1445,11.78,698,30,FAIL,PASS,PASS,0,0,None,false,product-service,,null,false,Recalibrate thresholds to p95<100ms for AKS; add DT warm-up stage,ADO-8
