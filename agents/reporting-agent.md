@@ -128,6 +128,12 @@ IF verdict == "FAIL":
 
 ## Report Generation (always runs — PASS and FAIL)
 
+**IMPORTANT:** The Reporting Agent is the **sole owner** of the HTML report.
+- Always generate the full HTML file — even if a file already exists at that path, **overwrite it**.
+- Never skip or abbreviate the HTML because the Execution Agent already wrote a file there.
+- The Execution Agent only produces a raw k6 JSON. The full report with cluster resources,
+  database load, observability evidence, root cause analysis, and next steps is this agent's output.
+
 **Before** the Pass Report or ticket creation, collect supporting data and generate two files.
 
 ### Pre-report Data Collection

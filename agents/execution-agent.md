@@ -237,6 +237,8 @@ Pipeline cannot continue without test results.
 - Print k6 stdout in full so the user can follow progress
 - If Prometheus remote write returns 401 or 429, log a warning but do not
   fail — test results are still valid; prompt user to set token in `.env`
+- **Do NOT generate an HTML report** — that is the Reporting Agent's sole responsibility.
+  Only save the raw k6 JSON output (`--summary-export`). Return the JSON path in `results_file`.
 
 ---
 
@@ -261,6 +263,5 @@ checks_rate_pct: <float>
 start_time: <ISO8601>
 end_time: <ISO8601>
 results_file: <json path>
-html_report: <html path>
 AGENT_RESULT_END
 ```
