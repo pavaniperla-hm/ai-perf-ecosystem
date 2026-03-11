@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Regression — regression-20260310-171248</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root{--pass:#10b981;--fail:#f43f5e;--warn:#f59e0b;--info:#38bdf8;--bg:#080c14;--surface:#0d1424;--card:#111827;--border:#1e2d42;--border-bright:#2a3f5c;--text:#e2e8f0;--muted:#64748b;--dim:#334155;--accent:#3b82f6;--ok:#10b981;--bad:#f43f5e}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.banner{background:linear-gradient(135deg,#0d1424 0%,#0f1e38 50%,#0d1424 100%);border-bottom:1px solid var(--border-bright);padding:2.5rem 3rem;position:relative;overflow:hidden}
+.banner::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 70% 50%,rgba(16,185,129,0.07) 0%,transparent 70%)}
+.banner-inner{position:relative;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;gap:2rem;flex-wrap:wrap}
+.banner-left h1{font-size:1.5rem;font-weight:600;letter-spacing:-0.02em;margin-bottom:.3rem}
+.run-id{font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--muted);letter-spacing:.04em}
+.run-id span{color:var(--info)}
+.meta-pills{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.9rem}
+.pill{background:rgba(255,255,255,.05);border:1px solid var(--border-bright);border-radius:20px;padding:.25rem .75rem;font-size:.75rem;color:var(--muted)}
+.pill b{color:var(--text)}
+.verdict-badge{display:flex;flex-direction:column;align-items:center;justify-content:center;width:110px;height:110px;border-radius:50%;font-weight:700;flex-shrink:0}
+.verdict-pass{background:radial-gradient(circle,#052e1c 0%,#021a0e 100%);border:2px solid var(--pass);box-shadow:0 0 30px rgba(16,185,129,.25)}
+.v-label{font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:.2rem;color:var(--muted)}
+.v-text{font-size:1.4rem;color:var(--pass)}
+.page{padding:2rem 3rem;max-width:1400px;margin:0 auto}
+.section-head{display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;margin-top:2rem}
+.section-head h2{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);white-space:nowrap}
+.section-head .line{flex:1;height:1px;background:var(--border)}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:2rem}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem}
+.kpi-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.4rem}
+.kpi-value{font-family:'JetBrains Mono',monospace;font-size:1.7rem;font-weight:700;line-height:1}
+.kpi-unit{font-size:.75rem;color:var(--muted);margin-top:.2rem}
+.kpi.ok .kpi-value{color:var(--pass)}
+.kpi.neutral .kpi-value{color:var(--text)}
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.5rem}
+.chart-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.5rem}
+.chart-panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem}
+.chart-title{font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:1rem}
+.chart-title span{color:var(--text)}
+.chart-wrap{position:relative;height:180px}
+.data-table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:1.5rem}
+.data-table th{background:var(--surface);color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;padding:.75rem 1rem;text-align:left;font-weight:600}
+.data-table td{padding:.7rem 1rem;border-top:1px solid var(--border);font-size:.84rem;font-family:'JetBrains Mono',monospace}
+.badge{display:inline-block;padding:.2rem .65rem;border-radius:5px;font-size:.7rem;font-weight:700;letter-spacing:.05em}
+.badge-pass{background:rgba(16,185,129,.15);color:var(--pass);border:1px solid rgba(16,185,129,.3)}
+.badge-fail{background:rgba(244,63,94,.15);color:var(--fail);border:1px solid rgba(244,63,94,.3)}
+.badge-warn{background:rgba(245,158,11,.15);color:var(--warn);border:1px solid rgba(245,158,11,.3)}
+.obs-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.5rem}
+.obs-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem}
+.obs-header{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem}
+.obs-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.obs-dot.green{background:var(--pass);box-shadow:0 0 6px rgba(16,185,129,.6)}
+.obs-dot.yellow{background:var(--warn);box-shadow:0 0 6px rgba(245,158,11,.6)}
+.obs-title{font-size:.85rem;font-weight:600}
+.obs-metric{display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.78rem}
+.obs-metric:last-child{border-bottom:none}
+.obs-metric-label{color:var(--muted)}
+.obs-metric-value{font-family:'JetBrains Mono',monospace;color:var(--text)}
+.obs-metric-value.ok{color:var(--pass)}
+.obs-metric-value.warn{color:var(--warn)}
+.obs-metric-value.bad{color:var(--fail)}
+.gauge-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:.75rem;margin-bottom:1.5rem}
+.gauge{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center}
+.gauge-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:.6rem}
+.gauge-bar-wrap{height:6px;background:var(--border);border-radius:3px;margin-bottom:.5rem;overflow:hidden}
+.gauge-bar{height:100%;border-radius:3px}
+.gauge-bar.low{background:var(--pass)}
+.gauge-bar.mid{background:var(--warn)}
+.gauge-pct{font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700}
+.gauge-pct.low{color:var(--pass)}
+.gauge-sub{font-size:.68rem;color:var(--muted);margin-top:.2rem}
+.box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1rem;line-height:1.65;font-size:.875rem}
+.box.warn-box{background:#0f0d02;border-color:#4a3800}
+.box-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.5rem;font-weight:600}
+.box.warn-box .box-label{color:var(--warn)}
+.info-box{background:#0c1220;border:1px solid #1e3a5f;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;font-size:.85rem;color:var(--info)}
+pre.log{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:1rem;font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.6;overflow-x:auto;white-space:pre-wrap;margin-bottom:1.5rem;color:#94a3b8}
+ol.steps{padding-left:1.5rem;margin-bottom:2rem}
+ol.steps li{font-size:.875rem;margin-bottom:.5rem;color:var(--text)}
+a{color:var(--info);text-decoration:none}
+a:hover{text-decoration:underline}
+.footer{text-align:center;padding:2rem;color:var(--dim);font-size:.75rem;border-top:1px solid var(--border);margin-top:2rem;font-family:'JetBrains Mono',monospace}
+</style>
+</head>
+<body>
+
+<!-- BANNER -->
+<div class="banner">
+  <div class="banner-inner">
+    <div class="banner-left">
+      <h1>AI Performance Regression Report</h1>
+      <div class="run-id">Run ID: <span>regression-20260310-171248</span></div>
+      <div class="meta-pills">
+        <div class="pill">Env: <b>aks</b></div>
+        <div class="pill">Endpoint: <b>http://20.82.174.115</b></div>
+        <div class="pill">Date: <b>2026-03-10 17:12 UTC</b></div>
+        <div class="pill">VUs: <b>20</b></div>
+        <div class="pill">Duration: <b>13m</b></div>
+        <div class="pill">Iterations: <b>1991</b></div>
+      </div>
+    </div>
+    <div class="verdict-badge verdict-pass">
+      <span class="v-label">Verdict</span>
+      <span class="v-text">&#10003; PASS</span>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- KPI ROW -->
+  <div class="section-head"><h2>Key Metrics</h2><div class="line"></div></div>
+  <div class="kpi-grid">
+    <div class="kpi neutral"><div class="kpi-label">Avg Latency</div><div class="kpi-value">42.5<span style="font-size:1rem"> ms</span></div></div>
+    <div class="kpi neutral"><div class="kpi-label">p90 Latency</div><div class="kpi-value">46.6<span style="font-size:1rem"> ms</span></div></div>
+    <div class="kpi ok"><div class="kpi-label">p95 Latency</div><div class="kpi-value">50.34<span style="font-size:1rem"> ms</span></div><div class="kpi-unit">threshold: &lt;2000ms &#10003;</div></div>
+    <div class="kpi neutral"><div class="kpi-label">Max Latency</div><div class="kpi-value">1140.8<span style="font-size:1rem"> ms</span></div></div>
+    <div class="kpi neutral"><div class="kpi-label">Total Reqs</div><div class="kpi-value">4 723</div></div>
+    <div class="kpi neutral"><div class="kpi-label">Throughput</div><div class="kpi-value">6.02<span style="font-size:1rem"> rps</span></div></div>
+    <div class="kpi ok"><div class="kpi-label">Error Rate</div><div class="kpi-value">0.021<span style="font-size:1rem">%</span></div></div>
+    <div class="kpi ok"><div class="kpi-label">Checks Passed</div><div class="kpi-value">9 444</div><div class="kpi-unit">2 failed</div></div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="section-head"><h2>Load Profile &amp; Response Time</h2><div class="line"></div></div>
+  <div class="chart-row">
+    <div class="chart-panel">
+      <div class="chart-title"><span>Virtual Users Over Time</span></div>
+      <div class="chart-wrap"><canvas id="vuChart"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span>Response Time (avg / p95) vs Time</span></div>
+      <div class="chart-wrap"><canvas id="rtChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-row">
+    <div class="chart-panel">
+      <div class="chart-title"><span>Throughput (req/s) Over Time</span></div>
+      <div class="chart-wrap"><canvas id="tpChart"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span>p95 by Transaction</span> <span style="color:var(--info);font-size:.7rem;margin-left:.5rem">— all within threshold</span></div>
+      <div class="chart-wrap"><canvas id="txnChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- THRESHOLD TABLE -->
+  <div class="section-head"><h2>Transaction Thresholds</h2><div class="line"></div></div>
+  <table class="data-table">
+    <thead><tr><th>Transaction</th><th>Avg (ms)</th><th>p90 (ms)</th><th>p95 (ms)</th><th>Threshold</th><th>Delta</th><th>Status</th></tr></thead>
+    <tbody><tr><td>User Login</td><td>43.9</td><td>48.0</td><td>51.1</td><td>&lt;1500ms</td><td style="color:var(--ok)">-1449ms</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Products List</td><td>43.1</td><td>48.0</td><td>52.0</td><td>&lt;1000ms</td><td style="color:var(--ok)">-948ms</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Product Detail</td><td>41.3</td><td>45.0</td><td>48.0</td><td>&lt;1000ms</td><td style="color:var(--ok)">-952ms</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Order History</td><td>47.7</td><td>46.0</td><td>49.5</td><td>&lt;1500ms</td><td style="color:var(--ok)">-1451ms</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Create Order</td><td>48.9</td><td>52.6</td><td>56.3</td><td>&lt;2000ms</td><td style="color:var(--ok)">-1944ms</td><td><span class="badge badge-pass">PASS</span></td></tr></tbody>
+  </table>
+
+  <!-- CLUSTER RESOURCE GAUGES -->
+  <div class="section-head"><h2>Cluster Resource Usage (during test window)</h2><div class="line"></div></div>
+  <div class="gauge-grid">
+    <div class="gauge">
+      <div class="gauge-label">user-service CPU</div>
+      <div class="gauge-bar-wrap"><div class="gauge-bar low" style="width:0.8%"></div></div>
+      <div class="gauge-pct low">0.8%</div>
+      <div class="gauge-sub">4m / 500m</div>
+    </div>
+    <div class="gauge">
+      <div class="gauge-label">product-service CPU</div>
+      <div class="gauge-bar-wrap"><div class="gauge-bar low" style="width:2%"></div></div>
+      <div class="gauge-pct low">2.0%</div>
+      <div class="gauge-sub">10m / 500m</div>
+    </div>
+    <div class="gauge">
+      <div class="gauge-label">order-service CPU</div>
+      <div class="gauge-bar-wrap"><div class="gauge-bar low" style="width:0.6%"></div></div>
+      <div class="gauge-pct low">0.6%</div>
+      <div class="gauge-sub">3m / 500m</div>
+    </div>
+    <div class="gauge">
+      <div class="gauge-label">user-service Mem</div>
+      <div class="gauge-bar-wrap"><div class="gauge-bar low" style="width:24.6%"></div></div>
+      <div class="gauge-pct low">24.6%</div>
+      <div class="gauge-sub">63Mi / 256Mi</div>
+    </div>
+    <div class="gauge">
+      <div class="gauge-label">product-service Mem</div>
+      <div class="gauge-bar-wrap"><div class="gauge-bar low" style="width:24.6%"></div></div>
+      <div class="gauge-pct low">24.6%</div>
+      <div class="gauge-sub">63Mi / 256Mi</div>
+    </div>
+    <div class="gauge">
+      <div class="gauge-label">order-service Mem</div>
+      <div class="gauge-bar-wrap"><div class="gauge-bar low" style="width:22.7%"></div></div>
+      <div class="gauge-pct low">22.7%</div>
+      <div class="gauge-sub">58Mi / 256Mi</div>
+    </div>
+  </div>
+
+  <!-- DB CHARTS -->
+  <div class="section-head"><h2>Database Load &amp; Active Connections</h2><div class="line"></div></div>
+  <div class="chart-row-3">
+    <div class="chart-panel">
+      <div class="chart-title"><span>user-db</span> — connections &amp; CPU</div>
+      <div class="chart-wrap"><canvas id="dbUserChart"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span>product-db</span> — connections &amp; CPU</div>
+      <div class="chart-wrap"><canvas id="dbProductChart"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span>order-db</span> — connections &amp; CPU</div>
+      <div class="chart-wrap"><canvas id="dbOrderChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- OBSERVABILITY -->
+  <div class="section-head"><h2>Observability Evidence</h2><div class="line"></div></div>
+  <div class="obs-grid">
+    <div class="obs-card">
+      <div class="obs-header">
+        <div class="obs-dot yellow"></div>
+        <div class="obs-title">Loki Log Analysis</div>
+      </div>
+      <div class="obs-metric"><span class="obs-metric-label">Log streams</span><span class="obs-metric-value">1</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Namespace filter</span><span class="obs-metric-value" style="font-size:.7rem">{namespace="perf-demo"}</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Error log lines</span><span class="obs-metric-value warn">7</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Warning log lines</span><span class="obs-metric-value ok">0</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Exceptions</span><span class="obs-metric-value warn">14</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Assessment</span><span class="obs-metric-value warn">1 TRANSIENT</span></div>
+    </div>
+    <div class="obs-card">
+      <div class="obs-header">
+        <div class="obs-dot green"></div>
+        <div class="obs-title">Dynatrace Monitoring</div>
+      </div>
+      <div class="obs-metric"><span class="obs-metric-label">Monitored services</span><span class="obs-metric-value">3</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Services</span><span class="obs-metric-value" style="font-size:.72rem">productdb, :80, product-service</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Open problems</span><span class="obs-metric-value ok">0</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Problems in window</span><span class="obs-metric-value ok">0</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Availability alerts</span><span class="obs-metric-value ok">0</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Assessment</span><span class="obs-metric-value ok">NO ISSUES</span></div>
+    </div>
+    <div class="obs-card">
+      <div class="obs-header">
+        <div class="obs-dot green"></div>
+        <div class="obs-title">Grafana Cloud</div>
+      </div>
+      <div class="obs-metric"><span class="obs-metric-label">Prometheus write</span><span class="obs-metric-value ok">OK</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Loki push</span><span class="obs-metric-value ok">OK</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Data points streamed</span><span class="obs-metric-value">4 723</span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Dashboard</span><span class="obs-metric-value" style="font-size:.72rem"><a href="https://myperformanceproject.grafana.net/d/k6-perf-v3" target="_blank">k6-perf-v3 &#8599;</a></span></div>
+      <div class="obs-metric"><span class="obs-metric-label">Assessment</span><span class="obs-metric-value ok">HEALTHY</span></div>
+    </div>
+  </div>
+
+  <!-- LOG EVIDENCE -->
+  <div class="section-head"><h2>Log Evidence (Loki)</h2><div class="line"></div></div>
+  <div class="info-box">1 transient DB connection drop at test start (17:12:48 UTC) — SQLAlchemy OperationalError on user-service. Self-recovered immediately. 1 checkout login returned HTTP 500, causing the single check failure. Not indicative of a systemic issue.</div>
+  <pre class="log">[user-service] 2026-03-10T17:12:48Z INFO  GET /users?email=patty33@example.net HTTP/1.1 500 Internal Server Error
+[user-service] 2026-03-10T17:12:48Z ERROR Exception in ASGI application
+[user-service] 2026-03-10T17:12:48Z ERROR sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) server closed the connection unexpectedly
+[user-service] 2026-03-10T17:12:48Z ERROR psycopg2.OperationalError: server closed the connection unexpectedly
+  (Background: https://sqlalche.me/e/20/e3q8)</pre>
+
+  <!-- ROOT CAUSE -->
+  <div class="section-head"><h2>Root Cause Analysis</h2><div class="line"></div></div>
+  <div class="box">
+    <div class="box-label">Root Cause</div>
+    <p>All 10 k6 thresholds passed. The application is healthy under 20 VU load. A single transient PostgreSQL connection drop occurred on user-service at test startup (17:12:48 UTC) — this is a cold-start connection pool initialisation race, not a sustained failure. The connection recovered automatically and all 1,990 subsequent iterations completed successfully. No Dynatrace problems, 0 open alerts, cluster CPU under 2% across all services.</p>
+  </div>
+  <div class="box warn-box">
+    <div class="box-label">Recommended Improvement</div>
+    <p>Add connection pool pre-warming or a startup probe delay to user-service to prevent the cold-start race condition on the first request. Consider adding SQLAlchemy connection pool retry logic (pool_pre_ping=True is already a best practice). This is a low-priority improvement — the test passed and the issue is isolated to the very first request after a pod restart.</p>
+  </div>
+
+  <!-- NEXT STEPS -->
+  <div class="section-head"><h2>Next Steps</h2><div class="line"></div></div>
+  <ol class="steps">
+    <li>Add <code>pool_pre_ping=True</code> to SQLAlchemy engine config in user-service to auto-recover stale connections</li>
+    <li>Consider a k6 <code>startupDelay</code> or warmup stage (1 VU for 30s) before ramping to full load</li>
+    <li>Run stress test (stress-test.js) to find the breaking point beyond 20 VUs</li>
+    <li>Add p99 threshold tracking alongside p95 for more tail-latency visibility</li>
+  </ol>
+
+  <!-- ALL CHECKS TABLE -->
+  <div class="section-head"><h2>Functional Checks (9444 passed / 2 failed)</h2><div class="line"></div></div>
+  <table class="data-table">
+    <thead><tr><th>Journey</th><th>Check</th><th>Passes</th><th>Fails</th><th>Status</th></tr></thead>
+    <tbody><tr><td>Checkout — Login</td><td>Checkout | Login | 200</td><td>215</td><td>1</td><td><span class="badge badge-warn">WARN</span></td></tr><tr><td>Checkout — Login</td><td>Checkout | Login | user returned</td><td>215</td><td>1</td><td><span class="badge badge-warn">WARN</span></td></tr><tr><td>Browse — Products List</td><td>Browse | Products List | 200</td><td>1272</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Browse — Products List</td><td>Browse | Products List | has items</td><td>1272</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>History — Login</td><td>History | Login | 200</td><td>191</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>History — Login</td><td>History | Login | user returned</td><td>191</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Cart — Login</td><td>Cart | Login | 200</td><td>312</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Cart — Login</td><td>Cart | Login | user returned</td><td>312</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Cart — Products List</td><td>Cart | Products List | 200</td><td>312</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Cart — Products List</td><td>Cart | Products List | has items</td><td>312</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>History — Order List</td><td>History | Order List | 200</td><td>191</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>History — Order List</td><td>History | Order List | is array</td><td>191</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Browse — Product Detail</td><td>Browse | Product Detail | 200</td><td>1272</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Browse — Product Detail</td><td>Browse | Product Detail | has price</td><td>1272</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Checkout — Products List</td><td>Checkout | Products List | 200</td><td>215</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Checkout — Products List</td><td>Checkout | Products List | has items</td><td>215</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Cart — Product Detail</td><td>Cart | Product Detail | 200</td><td>312</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Cart — Product Detail</td><td>Cart | Product Detail | has price</td><td>312</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Checkout — Product Detail</td><td>Checkout | Product Detail | 200</td><td>215</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Checkout — Product Detail</td><td>Checkout | Product Detail | has price</td><td>215</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Checkout — Place Order</td><td>Checkout | Place Order | 201</td><td>215</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr><tr><td>Checkout — Place Order</td><td>Checkout | Place Order | order created</td><td>215</td><td>0</td><td><span class="badge badge-pass">PASS</span></td></tr></tbody>
+  </table>
+
+</div>
+
+<div class="footer">Generated by AI Performance Engineering Pipeline &nbsp;&middot;&nbsp; Claude Code &nbsp;&middot;&nbsp; 2026-03-10T17:30Z</div>
+
+<script>
+const timeLabels = ["0s","90s","180s","270s","360s","450s","540s","630s","780s"];
+const vuData     = [0,8,16,20,20,20,20,18,8];
+const avgData    = [24,36,41,43,43,44,43,43,42];
+const p95Data    = [30,44,49,51,51,52,51,50,49];
+const tpData     = [0,3.5,5.8,6.1,6.1,6.2,6,6.1,5.8];
+const txnLabels  = ["Login","Products","Detail","History","Order"];
+const txnP95     = [51.1,52,48,49.5,56.3];
+const txnLimits  = [1500,1000,1000,1500,2000];
+const dbUserConns    = [1,1,1,1,1,1,1,1,1];
+const dbProductConns = [1,1,1,1,1,1,1,1,1];
+const dbOrderConns   = [1,1,1,1,1,1,1,1,1];
+const dbUserCPU    = [1.6,1.6,1.8,1.8,1.8,1.8,1.6,1.6,1.6];
+const dbProductCPU = [1.6,1.8,2,2.2,2.2,2.2,2,1.8,1.8];
+const dbOrderCPU   = [1.6,1.6,1.8,1.8,1.8,1.8,1.8,1.8,1.8];
+
+const txnColors  = txnP95.map((v,i) => v > txnLimits[i] ? 'rgba(244,63,94,0.6)' : 'rgba(16,185,129,0.6)');
+const txnBorders = txnP95.map((v,i) => v > txnLimits[i] ? '#f43f5e' : '#10b981');
+
+const cd = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#64748b',font:{size:11},boxWidth:12}}},
+  scales:{
+    x:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'}},
+    y:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'}}
+  }
+};
+
+new Chart(document.getElementById('vuChart'),{
+  type:'line',
+  data:{labels:timeLabels,datasets:[{label:'Virtual Users',data:vuData,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.08)',tension:0.4,fill:true,pointRadius:3}]},
+  options:{...cd}
+});
+
+new Chart(document.getElementById('rtChart'),{
+  type:'line',
+  data:{labels:timeLabels,datasets:[
+    {label:'Avg (ms)',data:avgData,borderColor:'#10b981',backgroundColor:'transparent',tension:0.4,pointRadius:3},
+    {label:'p95 (ms)',data:p95Data,borderColor:'#f43f5e',backgroundColor:'rgba(244,63,94,0.05)',tension:0.4,fill:true,pointRadius:3,borderDash:[4,3]},
+    {label:'p95 threshold',data:Array(timeLabels.length).fill(2000),borderColor:'#f59e0b',backgroundColor:'transparent',borderDash:[6,4],pointRadius:0}
+  ]},
+  options:{...cd}
+});
+
+new Chart(document.getElementById('tpChart'),{
+  type:'bar',
+  data:{labels:timeLabels,datasets:[{label:'req/s',data:tpData,backgroundColor:'rgba(59,130,246,0.5)',borderColor:'#3b82f6',borderWidth:1,borderRadius:3}]},
+  options:{...cd}
+});
+
+new Chart(document.getElementById('txnChart'),{
+  type:'bar',
+  data:{labels:txnLabels,datasets:[
+    {label:'p95 (ms)',data:txnP95,backgroundColor:txnColors,borderColor:txnBorders,borderWidth:1,borderRadius:3},
+    {label:'Threshold (ms)',data:txnLimits,backgroundColor:'rgba(245,158,11,0.15)',borderColor:'#f59e0b',borderWidth:1,borderRadius:3}
+  ]},
+  options:{...cd,indexAxis:'y'}
+});
+
+function dbChart(id, conns, cpu) {
+  new Chart(document.getElementById(id),{
+    type:'line',
+    data:{labels:timeLabels,datasets:[
+      {label:'Connections',data:conns,borderColor:'#a78bfa',backgroundColor:'transparent',tension:0.4,pointRadius:2,yAxisID:'y'},
+      {label:'CPU %',data:cpu,borderColor:'#fb923c',backgroundColor:'rgba(251,146,60,0.08)',tension:0.4,pointRadius:2,fill:true,yAxisID:'y1'}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#64748b',font:{size:10},boxWidth:10}}},
+      scales:{
+        x:{ticks:{color:'#475569',font:{size:9}},grid:{color:'#1e2d42'}},
+        y:{ticks:{color:'#a78bfa',font:{size:9}},grid:{color:'#1e2d42'},position:'left',title:{display:true,text:'Conns',color:'#a78bfa',font:{size:9}}},
+        y1:{ticks:{color:'#fb923c',font:{size:9}},grid:{drawOnChartArea:false},position:'right',title:{display:true,text:'CPU%',color:'#fb923c',font:{size:9}}}
+      }
+    }
+  });
+}
+dbChart('dbUserChart',    dbUserConns,    dbUserCPU);
+dbChart('dbProductChart', dbProductConns, dbProductCPU);
+dbChart('dbOrderChart',   dbOrderConns,   dbOrderCPU);
+</script>
+</body>
+</html>

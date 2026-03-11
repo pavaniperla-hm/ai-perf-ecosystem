@@ -137,9 +137,9 @@ Then prompt the Orchestrator agent:
 |---|---|---|---|
 | 0 | Health Check | `agents/healthcheck-agent.md` | Validates services, pods, DB connectivity. Stops pipeline on failure. |
 | 1 | Data | `agents/data-agent.md` | Queries live DBs via MCP, generates `k6/data/test-data-checkout.csv` |
-| 2 | Execution | `agents/execution-agent.md` | Runs k6 baseline/stress/realistic test, writes JSON + HTML results |
+| 2 | Execution | `agents/execution-agent.md` | Runs k6 test, writes raw **JSON only** — does NOT generate HTML |
 | 3 | Analysis | `agents/analysis-agent.md` | Interprets k6 results, queries Loki for errors, determines PASS/FAIL |
-| 4 | Reporting | `agents/reporting-agent.md` | Creates Jira issue (local) or Azure DevOps work item (AKS) with evidence |
+| 4 | Reporting | `agents/reporting-agent.md` | **Sole owner of HTML report.** Collects kubectl/DB/DT/Loki evidence, generates full HTML, creates ticket |
 
 **Orchestrator file:** `agents/orchestrator.md`
 
@@ -148,10 +148,24 @@ Then prompt the Orchestrator agent:
 Orchestrator
   → Health Check Agent  (HEALTH_CHECK_PASSED / HEALTH_CHECK_FAILED)
   → Data Agent          (file_path, row_count, environment)
-  → Execution Agent     (results_json, html_report, summary stats)
+  → Execution Agent     (results_json, summary stats)   ← no HTML
   → Analysis Agent      (verdict: PASS/FAIL, threshold_breaches, loki_errors)
-  → Reporting Agent     (ticket_url, ticket_id)
+  → Reporting Agent     (full HTML report, CSV row, ticket_url)
 ```
+
+### Demo Mode — sub-agent pipeline
+Each stage runs as an **isolated sub-agent** via the `Agent` tool. All noisy tool calls
+(kubectl, curl, k6 output, file reads) stay inside the sub-agent's context. The main
+orchestrator thread shows only:
+- `╔══╗` stage launch banners (before each Agent tool call)
+- `┌──┐` handoff summary cards (parsed from each agent's `AGENT_RESULT_START/END` block)
+- Final `══` pipeline summary
+
+Each agent ends its response with a structured `AGENT_RESULT_START / AGENT_RESULT_END` block
+that the orchestrator parses to build the handoff card. This keeps the demo clean for audiences.
+
+**Prompt to trigger the full pipeline:**
+> "Run a regression test on AKS"
 
 ---
 
@@ -375,3 +389,11 @@ KeyError: 'sitecustomize'
 **Cause:** The DT API token has `metrics.ingest` scope only — `metrics.read` is not granted. The analysis agent therefore skips all metrics-level queries (response time breakdown, DB time %) and returns null for those fields.
 **Impact:** DT can still detect monitored entities and open problems. Service-level timing data is unavailable via the analysis agent.
 **Fix:** To populate these fields, create a new DT API token with `metrics.read` scope added, update `DYNATRACE_API_TOKEN` in `.env`, and update the `dynakube` k8s secret accordingly.
+
+### 9. HTML report missing cluster/DB/observability sections — ownership confusion
+**Symptom:** HTML report only has basic metrics (KPIs, charts, threshold table) — no Cluster Resource Usage, Database Load, Observability Evidence, Root Cause Analysis, or Next Steps sections.
+**Cause:** The execution agent's `Demo Return Contract` included `html_report` in its output block, causing it to generate a minimal HTML as a side effect. The reporting agent then saw the file already existed and skipped its own full generation (`"pre-existing from execution agent — confirmed intact"`).
+**Fix (applied):**
+- `execution-agent.md`: explicit rule added — *"Do NOT generate an HTML report"*. `html_report` removed from return contract.
+- `reporting-agent.md`: IMPORTANT note added — *"Always overwrite the HTML even if a file already exists. Reporting agent is the sole HTML owner."*
+**Rule:** Execution agent owns the raw k6 JSON only. Reporting agent owns the full HTML (always generates fresh with all 8 sections: KPIs, load profile, thresholds, cluster resources, DB connections, observability evidence, root cause, next steps).
