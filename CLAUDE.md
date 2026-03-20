@@ -390,6 +390,33 @@ KeyError: 'sitecustomize'
 **Impact:** DT can still detect monitored entities and open problems. Service-level timing data is unavailable via the analysis agent.
 **Fix:** To populate these fields, create a new DT API token with `metrics.read` scope added, update `DYNATRACE_API_TOKEN` in `.env`, and update the `dynakube` k8s secret accordingly.
 
+### 10. Dynatrace webhook crash-loop — expired TLS cert + operator scaled to 0
+**Symptom:** `dynatrace-webhook` pod in CrashLoopBackOff (400+ restarts). Logs show:
+```
+"certificate is outdated, waiting for new ones","Valid until":"<past date>"
+```
+Liveness probe at `:10080/livez` times out → kubelet kills and restarts the container repeatedly.
+**Root cause:** Two compounding issues:
+1. `dynatrace-operator` deployment was scaled to 0 replicas — no operator running means nobody rotates the webhook TLS certificate when it expires.
+2. `dynatrace-webhook-certs` secret held an expired certificate.
+**Fix:**
+```bash
+# 1. Scale operator back up
+kubectl scale deployment dynatrace-operator -n dynatrace --replicas=1
+kubectl rollout status deployment/dynatrace-operator -n dynatrace --timeout=60s
+
+# 2. Delete the expired cert secret (operator will regenerate it)
+kubectl delete secret dynatrace-webhook-certs -n dynatrace
+
+# 3. Delete the operator pod to force bootstrap mode (cert re-generation)
+kubectl delete pod -n dynatrace -l internal.dynatrace.com/app=operator
+
+# 4. Wait ~15s for operator to generate fresh root + server certs, then delete webhook pod
+kubectl delete pod -n dynatrace -l internal.dynatrace.com/app=webhook
+```
+Verify with: `kubectl get pods -n dynatrace` — all 3 pods should be `1/1 Running`.
+**Rule:** Never scale `dynatrace-operator` to 0. It owns certificate rotation. If scaled to 0 for maintenance, scale back up immediately after.
+
 ### 9. HTML report missing cluster/DB/observability sections — ownership confusion
 **Symptom:** HTML report only has basic metrics (KPIs, charts, threshold table) — no Cluster Resource Usage, Database Load, Observability Evidence, Root Cause Analysis, or Next Steps sections.
 **Cause:** The execution agent's `Demo Return Contract` included `html_report` in its output block, causing it to generate a minimal HTML as a side effect. The reporting agent then saw the file already existed and skipped its own full generation (`"pre-existing from execution agent — confirmed intact"`).

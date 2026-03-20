@@ -1,0 +1,2 @@
+date,scenario,environment,verdict,avg_ms,p90_ms,p95_ms,max_ms,error_rate_pct,checks_rate_pct,total_requests,rps,iterations,p99_threshold_ms,p99_status,error_status,checks_status,loki_errors,loki_warnings,loki_affected_services,dt_skipped,dt_slowest_service,dt_slowest_ms,dt_db_pct,dt_db_bottleneck,dt_recommended_fix,ticket_key
+2026-03-17,checkout regression,aks,FAIL,45.61,50.32,53.31,129.29,0.00,100.00,1493,12.16,721,500,PASS,PASS,PASS,0,0,none,false,n/a,,null,false,Uniform latency — check AKS ingress keep-alive / PostgreSQL connection pool,ADO-13

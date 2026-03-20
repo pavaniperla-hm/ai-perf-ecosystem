@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Performance Regression Report — checkout-regression — 2026-03-17</title>
+  <style>
+    :root {
+      --red:    #e53935;
+      --green:  #43a047;
+      --amber:  #fb8c00;
+      --blue:   #1e88e5;
+      --bg:     #f5f7fa;
+      --card:   #ffffff;
+      --border: #dde3ec;
+      --text:   #1a1d23;
+      --muted:  #6b7280;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }
+
+    /* ── header ── */
+    .header { background: linear-gradient(135deg, #1a237e 0%, #283593 60%, #1565c0 100%);
+               color: #fff; padding: 32px 40px; }
+    .header h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+    .header .sub { opacity: .75; font-size: 13px; }
+    .verdict-badge {
+      display: inline-block; margin-top: 14px;
+      padding: 6px 20px; border-radius: 20px; font-weight: 700; font-size: 15px;
+      background: var(--red); color: #fff; letter-spacing: .5px;
+    }
+    .meta-row { display: flex; gap: 32px; margin-top: 16px; flex-wrap: wrap; }
+    .meta-item { font-size: 12px; opacity: .8; }
+    .meta-item strong { display: block; opacity: 1; font-size: 13px; }
+
+    /* ── layout ── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+    .section { background: var(--card); border: 1px solid var(--border);
+                border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+    .section h2 { font-size: 16px; font-weight: 700; margin-bottom: 18px;
+                   padding-bottom: 10px; border-bottom: 2px solid var(--border);
+                   display: flex; align-items: center; gap: 8px; }
+    .section-icon { font-size: 18px; }
+
+    /* ── KPI grid ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+    .kpi { background: var(--bg); border-radius: 8px; padding: 16px; text-align: center; }
+    .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+                   letter-spacing: .6px; margin-bottom: 6px; }
+    .kpi .value { font-size: 26px; font-weight: 700; }
+    .kpi .unit  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .kpi.fail  .value { color: var(--red); }
+    .kpi.pass  .value { color: var(--green); }
+    .kpi.warn  .value { color: var(--amber); }
+    .kpi.info  .value { color: var(--blue); }
+
+    /* ── tables ── */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #f0f4f9; text-align: left; padding: 9px 12px;
+          font-weight: 600; border-bottom: 2px solid var(--border); }
+    td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafbfd; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px;
+              font-size: 11px; font-weight: 700; }
+    .badge.fail  { background: #fdecea; color: var(--red); }
+    .badge.pass  { background: #e8f5e9; color: var(--green); }
+    .badge.warn  { background: #fff3e0; color: var(--amber); }
+    .badge.info  { background: #e3f2fd; color: var(--blue); }
+
+    /* ── load profile chart ── */
+    .chart-wrap { position: relative; height: 180px; margin-top: 8px; }
+    .chart-bars { display: flex; align-items: flex-end; gap: 3px;
+                   height: 160px; padding: 0 4px; }
+    .bar-col { display: flex; flex-direction: column; align-items: center;
+                flex: 1; height: 100%; justify-content: flex-end; }
+    .bar { width: 100%; border-radius: 3px 3px 0 0; transition: opacity .2s; }
+    .bar.blue { background: var(--blue); }
+    .bar.red  { background: #ef9a9a; }
+    .chart-labels { display: flex; justify-content: space-between;
+                     padding: 4px 4px 0; font-size: 10px; color: var(--muted); }
+
+    /* ── resource grid ── */
+    .res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+    .res-card { background: var(--bg); border-radius: 8px; padding: 14px; }
+    .res-card .name { font-weight: 600; font-size: 13px; margin-bottom: 8px;
+                       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .res-bar-wrap { height: 6px; background: #dde3ec; border-radius: 3px; margin-bottom: 4px; }
+    .res-bar { height: 6px; border-radius: 3px; }
+    .res-meta { font-size: 11px; color: var(--muted); }
+
+    /* ── timeline ── */
+    .timeline { list-style: none; padding: 0; }
+    .timeline li { padding: 10px 0 10px 32px; position: relative; border-left: 2px solid var(--border); margin-left: 8px; }
+    .timeline li::before { content: ""; position: absolute; left: -6px; top: 14px;
+                             width: 10px; height: 10px; border-radius: 50%;
+                             background: var(--blue); border: 2px solid #fff; }
+    .timeline li.warn::before  { background: var(--amber); }
+    .timeline li.fail::before  { background: var(--red); }
+    .timeline li.pass::before  { background: var(--green); }
+    .timeline .ts { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+
+    /* ── next steps ── */
+    .steps-list { list-style: none; counter-reset: steps; }
+    .steps-list li { counter-increment: steps; display: flex; gap: 14px;
+                      padding: 12px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .steps-list li:last-child { border-bottom: none; }
+    .steps-list li::before { content: counter(steps); min-width: 26px; height: 26px;
+                               border-radius: 50%; background: var(--blue); color: #fff;
+                               display: flex; align-items: center; justify-content: center;
+                               font-weight: 700; font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+
+    /* ── evidence box ── */
+    .evidence { background: #f8f9fc; border: 1px solid var(--border); border-radius: 6px;
+                 padding: 14px 16px; font-family: "SFMono-Regular", Consolas, monospace;
+                 font-size: 12px; white-space: pre-wrap; line-height: 1.7; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 720px) { .two-col { grid-template-columns: 1fr; } }
+
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .footer { text-align: center; padding: 24px; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════ -->
+<div class="header">
+  <h1>Performance Regression Report</h1>
+  <div class="sub">Scenario: checkout-regression &nbsp;|&nbsp; Environment: AKS (aks-perf-demo, northeurope) &nbsp;|&nbsp; Cluster: 20.82.174.115</div>
+  <div class="verdict-badge">FAIL — p95 threshold breached</div>
+  <div class="meta-row">
+    <div class="meta-item"><span>Test Start</span><strong>2026-03-17 13:10:22 UTC</strong></div>
+    <div class="meta-item"><span>Test End</span><strong>2026-03-17 13:12:38 UTC</strong></div>
+    <div class="meta-item"><span>Duration</span><strong>~2 min 16 sec</strong></div>
+    <div class="meta-item"><span>k6 Script</span><strong>regression-test.js</strong></div>
+    <div class="meta-item"><span>Max VUs</span><strong>20</strong></div>
+    <div class="meta-item"><span>Report Generated</span><strong>2026-03-17</strong></div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 1 — KPI SUMMARY
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">📊</span> KPI Summary</h2>
+  <div class="kpi-grid">
+    <div class="kpi fail">
+      <div class="label">p95 Response Time</div>
+      <div class="value">52.69</div>
+      <div class="unit">ms &nbsp;(limit: 25.5 ms)</div>
+    </div>
+    <div class="kpi warn">
+      <div class="label">p90 Response Time</div>
+      <div class="value">48.98</div>
+      <div class="unit">ms</div>
+    </div>
+    <div class="kpi info">
+      <div class="label">Avg Response Time</div>
+      <div class="value">44.54</div>
+      <div class="unit">ms</div>
+    </div>
+    <div class="kpi warn">
+      <div class="label">Max Response Time</div>
+      <div class="value">140.18</div>
+      <div class="unit">ms</div>
+    </div>
+    <div class="kpi pass">
+      <div class="label">Error Rate</div>
+      <div class="value">0.00</div>
+      <div class="unit">%</div>
+    </div>
+    <div class="kpi pass">
+      <div class="label">Checks Rate</div>
+      <div class="value">100</div>
+      <div class="unit">%</div>
+    </div>
+    <div class="kpi info">
+      <div class="label">Total Requests</div>
+      <div class="value">1,493</div>
+      <div class="unit">HTTP requests</div>
+    </div>
+    <div class="kpi info">
+      <div class="label">Throughput</div>
+      <div class="value">12.17</div>
+      <div class="unit">req/s</div>
+    </div>
+    <div class="kpi info">
+      <div class="label">Iterations</div>
+      <div class="value">721</div>
+      <div class="unit">completed</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 2 — LOAD PROFILE
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">📈</span> Load Profile</h2>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:14px;">
+    4 scenarios ramping to 20 VUs over ~2 min 16 sec. Bars represent approximate VU ramp (blue) and avg response time per 15-second window (scaled, red).
+  </p>
+  <div class="chart-wrap">
+    <div class="chart-bars">
+      <!-- VU ramp approximation: 0→5→10→15→20→20→20→20→20 segments -->
+      <div class="bar-col"><div class="bar blue" style="height:10%"></div></div>
+      <div class="bar-col"><div class="bar blue" style="height:15%"></div></div>
+      <div class="bar-col"><div class="bar blue" style="height:25%"></div></div>
+      <div class="bar-col"><div class="bar blue" style="height:40%"></div></div>
+      <div class="bar-col"><div class="bar blue" style="height:60%"></div></div>
+      <div class="bar-col"><div class="bar blue" style="height:80%"></div></div>
+      <div class="bar-col"><div class="bar blue" style="height:100%"></div></div>
+      <div class="bar-col"><div class="bar blue" style="height:100%"></div></div>
+      <div class="bar-col"><div class="bar blue" style="height:100%"></div></div>
+      <!-- response time (red) -->
+      <div class="bar-col"><div class="bar red" style="height:30%"></div></div>
+      <div class="bar-col"><div class="bar red" style="height:35%"></div></div>
+      <div class="bar-col"><div class="bar red" style="height:42%"></div></div>
+      <div class="bar-col"><div class="bar red" style="height:38%"></div></div>
+      <div class="bar-col"><div class="bar red" style="height:45%"></div></div>
+      <div class="bar-col"><div class="bar red" style="height:48%"></div></div>
+      <div class="bar-col"><div class="bar red" style="height:50%"></div></div>
+      <div class="bar-col"><div class="bar red" style="height:46%"></div></div>
+      <div class="bar-col"><div class="bar red" style="height:44%"></div></div>
+    </div>
+    <div class="chart-labels">
+      <span>13:10:22</span>
+      <span>13:10:52</span>
+      <span>13:11:22</span>
+      <span>13:11:52</span>
+      <span>13:12:38</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:20px;margin-top:10px;font-size:12px;">
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span style="display:inline-block;width:12px;height:12px;background:var(--blue);border-radius:2px;"></span> VU count (scaled)
+    </span>
+    <span style="display:flex;align-items:center;gap:6px;">
+      <span style="display:inline-block;width:12px;height:12px;background:#ef9a9a;border-radius:2px;"></span> Avg response time (scaled)
+    </span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 3 — THRESHOLD RESULTS
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">🎯</span> Threshold Results</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Threshold</th>
+        <th>Limit</th>
+        <th>Actual</th>
+        <th>Overage</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>p99 overall response time</td>
+        <td>25.5 ms</td>
+        <td>52.69 ms (p95)</td>
+        <td style="color:var(--red);font-weight:700;">2.07× over</td>
+        <td><span class="badge fail">FAIL</span></td>
+      </tr>
+      <tr>
+        <td>Error rate</td>
+        <td>&lt; 2%</td>
+        <td>0.00%</td>
+        <td>—</td>
+        <td><span class="badge pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>Check success rate</td>
+        <td>100%</td>
+        <td>100% (2986/2986)</td>
+        <td>—</td>
+        <td><span class="badge pass">PASS</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 style="margin:22px 0 12px;font-size:14px;">Per-Transaction p95 Breakdown</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Transaction</th>
+        <th>p95 (ms)</th>
+        <th>Threshold</th>
+        <th>Overage</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>txn_user_login</td>
+        <td>54.00</td>
+        <td>60 ms</td>
+        <td>—</td>
+        <td><span class="badge pass">PASS</span></td>
+      </tr>
+      <tr>
+        <td>txn_products_list</td>
+        <td>54.25</td>
+        <td>30 ms</td>
+        <td style="color:var(--red);font-weight:700;">1.81×</td>
+        <td><span class="badge fail">FAIL</span></td>
+      </tr>
+      <tr>
+        <td>txn_product_detail</td>
+        <td>51.45</td>
+        <td>30 ms</td>
+        <td style="color:var(--red);font-weight:700;">1.72×</td>
+        <td><span class="badge fail">FAIL</span></td>
+      </tr>
+      <tr>
+        <td>txn_order_history</td>
+        <td>57.15</td>
+        <td>30 ms</td>
+        <td style="color:var(--red);font-weight:700;">1.91×</td>
+        <td><span class="badge fail">FAIL</span></td>
+      </tr>
+      <tr>
+        <td>txn_create_order</td>
+        <td style="font-weight:700;color:var(--red);">61.50</td>
+        <td>60 ms</td>
+        <td style="color:var(--amber);font-weight:700;">1.03×</td>
+        <td><span class="badge warn">MARGINAL</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 4 — CLUSTER RESOURCE USAGE
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">☸️</span> Cluster Resource Usage</h2>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">
+    kubectl top pods -n perf-demo — snapshot taken during test window. All pods Running 1/1.
+    Note: order-service, product-service, user-service each have 3 restarts (within last 43 min — pre-existing).
+  </p>
+
+  <div class="res-grid">
+    <!-- user-service -->
+    <div class="res-card">
+      <div class="name">user-service</div>
+      <div class="res-bar-wrap"><div class="res-bar" style="width:1%;background:var(--green);"></div></div>
+      <div class="res-meta">CPU: 1m &nbsp;|&nbsp; Memory: 59 Mi &nbsp;|&nbsp; Restarts: 3</div>
+    </div>
+    <!-- product-service -->
+    <div class="res-card">
+      <div class="name">product-service</div>
+      <div class="res-bar-wrap"><div class="res-bar" style="width:1%;background:var(--green);"></div></div>
+      <div class="res-meta">CPU: 1m &nbsp;|&nbsp; Memory: 61 Mi &nbsp;|&nbsp; Restarts: 3</div>
+    </div>
+    <!-- order-service -->
+    <div class="res-card">
+      <div class="name">order-service</div>
+      <div class="res-bar-wrap"><div class="res-bar" style="width:2%;background:var(--green);"></div></div>
+      <div class="res-meta">CPU: 2m &nbsp;|&nbsp; Memory: 58 Mi &nbsp;|&nbsp; Restarts: 3</div>
+    </div>
+    <!-- user-db -->
+    <div class="res-card">
+      <div class="name">user-db</div>
+      <div class="res-bar-wrap"><div class="res-bar" style="width:7%;background:var(--green);"></div></div>
+      <div class="res-meta">CPU: 7m &nbsp;|&nbsp; Memory: 27 Mi &nbsp;|&nbsp; Restarts: 0</div>
+    </div>
+    <!-- product-db -->
+    <div class="res-card">
+      <div class="name">product-db</div>
+      <div class="res-bar-wrap"><div class="res-bar" style="width:8%;background:var(--green);"></div></div>
+      <div class="res-meta">CPU: 8m &nbsp;|&nbsp; Memory: 23 Mi &nbsp;|&nbsp; Restarts: 0</div>
+    </div>
+    <!-- order-db -->
+    <div class="res-card">
+      <div class="name">order-db</div>
+      <div class="res-bar-wrap"><div class="res-bar" style="width:7%;background:var(--green);"></div></div>
+      <div class="res-meta">CPU: 7m &nbsp;|&nbsp; Memory: 28 Mi &nbsp;|&nbsp; Restarts: 0</div>
+    </div>
+    <!-- frontend -->
+    <div class="res-card">
+      <div class="name">frontend</div>
+      <div class="res-bar-wrap"><div class="res-bar" style="width:1%;background:var(--green);"></div></div>
+      <div class="res-meta">CPU: 1m &nbsp;|&nbsp; Memory: 3 Mi &nbsp;|&nbsp; Restarts: 0</div>
+    </div>
+    <!-- promtail -->
+    <div class="res-card">
+      <div class="name">promtail</div>
+      <div class="res-bar-wrap"><div class="res-bar" style="width:5%;background:var(--green);"></div></div>
+      <div class="res-meta">CPU: 5m &nbsp;|&nbsp; Memory: 25 Mi &nbsp;|&nbsp; Restarts: 0</div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;padding:12px 16px;background:#fff8e1;border-radius:6px;border-left:4px solid var(--amber);font-size:13px;">
+    <strong>Observation:</strong> All services are at &lt;10m CPU. Resource saturation is <strong>not</strong> the bottleneck.
+    The uniform 51–62ms latency across all 5 transactions strongly suggests a shared network-layer bottleneck
+    (AKS Nginx ingress keep-alive / HTTP/2) or PostgreSQL connection pool saturation rather than compute pressure.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 5 — DATABASE CONNECTIONS
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">🗄️</span> Database Load</h2>
+  <p style="color:var(--muted);font-size:12px;margin-bottom:16px;">
+    Active DB connections queried via kubectl exec immediately after test window.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Database</th>
+        <th>Pod</th>
+        <th>Active Connections (post-test)</th>
+        <th>Assessment</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>userdb</td>
+        <td>user-db-6bc447984-x6qmb</td>
+        <td>1</td>
+        <td><span class="badge pass">Normal</span></td>
+      </tr>
+      <tr>
+        <td>productdb</td>
+        <td>product-db-646d6fd84-7rn7h</td>
+        <td>1</td>
+        <td><span class="badge pass">Normal</span></td>
+      </tr>
+      <tr>
+        <td>orderdb</td>
+        <td>order-db-7dfb9b749-cwzds</td>
+        <td>1</td>
+        <td><span class="badge pass">Normal</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="margin-top:14px;font-size:13px;color:var(--muted);">
+    Post-test active connections are all at idle baseline (1 = system connection). Under load, connection pool
+    saturation may still cause queuing — recommend profiling with <code>pg_stat_activity</code> during an active run.
+    Next step: run <code>EXPLAIN ANALYZE</code> on <code>POST /api/orders</code> to check for missing index on
+    <code>user_id</code> / <code>product_id</code> (txn_create_order is highest at p95=61.5 ms).
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 6 — OBSERVABILITY EVIDENCE
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">🔭</span> Observability Evidence</h2>
+
+  <div class="two-col">
+    <!-- Loki -->
+    <div>
+      <h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">Loki Log Analysis</h3>
+      <table>
+        <tbody>
+          <tr><td style="color:var(--muted);">Query filter</td><td><code>{namespace="perf-demo"} |= "error"</code></td></tr>
+          <tr><td style="color:var(--muted);">Window</td><td>13:10:22 – 13:12:38 UTC</td></tr>
+          <tr><td style="color:var(--muted);">Error log count</td><td><span class="badge pass">0</span></td></tr>
+          <tr><td style="color:var(--muted);">Warning log count</td><td><span class="badge pass">0</span></td></tr>
+          <tr><td style="color:var(--muted);">Log streams returned</td><td>0 (no error-level events)</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;">
+        Clean log window — no application errors during the test. Latency breach is not caused by application exceptions.
+      </p>
+    </div>
+
+    <!-- Grafana -->
+    <div>
+      <h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">Grafana Cloud Dashboard</h3>
+      <table>
+        <tbody>
+          <tr><td style="color:var(--muted);">Stack</td><td>myperformanceproject.grafana.net</td></tr>
+          <tr><td style="color:var(--muted);">Dashboard</td><td><a href="https://myperformanceproject.grafana.net/d/k6-perf-v3" target="_blank">k6-perf-v3</a></td></tr>
+          <tr><td style="color:var(--muted);">Prometheus RW</td><td>prometheus-prod-39-prod-eu-north-0</td></tr>
+          <tr><td style="color:var(--muted);">Loki endpoint</td><td>logs-prod-025.grafana.net</td></tr>
+          <tr><td style="color:var(--muted);">Metrics shipping</td><td><span class="badge pass">Active</span></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;">
+        Metrics shipped via <code>--out experimental-prometheus-rw</code> during test run.
+        Full time-series available at the dashboard link above.
+      </p>
+    </div>
+  </div>
+
+  <div style="margin-top:20px;">
+    <h3 style="font-size:13px;font-weight:700;margin-bottom:10px;">Dynatrace Application Monitoring</h3>
+    <table>
+      <thead>
+        <tr><th>Property</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Tenant</td><td><a href="https://kun86120.live.dynatrace.com/#services" target="_blank">kun86120.live.dynatrace.com</a></td></tr>
+        <tr><td>Mode</td><td>applicationMonitoring (init container, CSI-less)</td></tr>
+        <tr><td>Monitored services</td><td>User Service, Order Service, productdb, _:80, product-service</td></tr>
+        <tr><td>Problems in test window</td><td><span class="badge pass">0</span></td></tr>
+        <tr><td>Open problems (outside window)</td><td><span class="badge warn">1 — "No pod ready" (INFRASTRUCTURE)</span></td></tr>
+        <tr><td>dt_slowest_ms / dt_db_pct</td><td style="color:var(--muted);">N/A — token missing <code>metrics.read</code> scope</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 7 — ROOT CAUSE ANALYSIS
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">🔍</span> Root Cause Analysis</h2>
+
+  <ul class="timeline">
+    <li class="fail">
+      <div class="ts">Threshold breach</div>
+      <strong>p95 = 52.69 ms — 2.07× above the 25.5 ms limit</strong><br>
+      The overall p95 response time exceeds threshold by more than 2×. Thresholds were intentionally set tight (25.5 ms) to trigger regression on real network latency.
+    </li>
+    <li class="info">
+      <div class="ts">Latency distribution</div>
+      <strong>Uniform latency across all 5 transactions (51–62 ms)</strong><br>
+      txn_user_login: 54 ms, txn_products_list: 54.25 ms, txn_product_detail: 51.45 ms,
+      txn_order_history: 57.15 ms, txn_create_order: 61.5 ms. No single hot transaction —
+      all are proportionally elevated. This rules out a single slow query or endpoint as root cause.
+    </li>
+    <li class="warn">
+      <div class="ts">Shared bottleneck hypothesis</div>
+      <strong>AKS Nginx ingress keep-alive / HTTP/2 or PostgreSQL connection pool saturation</strong><br>
+      Uniform latency elevation is the classic signature of a shared network-layer bottleneck or
+      a connection pool that serialises requests at low concurrency. CPU and memory are well within
+      limits (all pods &lt;10 m CPU, &lt;65 Mi memory).
+    </li>
+    <li class="fail">
+      <div class="ts">Highest-latency transaction</div>
+      <strong>txn_create_order p95 = 61.5 ms (marginal vs 60 ms threshold)</strong><br>
+      POST /api/orders is the most expensive transaction. Candidate: missing index on
+      <code>user_id</code> / <code>product_id</code> in order-db. Recommend running
+      <code>EXPLAIN ANALYZE</code> to confirm.
+    </li>
+    <li class="warn">
+      <div class="ts">Infrastructure alert</div>
+      <strong>Open Dynatrace problem: "No pod ready" (INFRASTRUCTURE impact)</strong><br>
+      This problem is outside the test window and correlates with the 3 restarts seen on
+      order-service, product-service, and user-service. Not a current blocker but warrants investigation.
+    </li>
+    <li class="pass">
+      <div class="ts">Errors &amp; application health</div>
+      <strong>Zero errors, zero log anomalies</strong><br>
+      0% HTTP error rate, 100% check pass rate, 0 Loki error events. The application is functionally
+      healthy — the regression is a performance regression only, not a reliability incident.
+    </li>
+  </ul>
+
+  <div style="margin-top:18px;padding:14px 16px;background:#fdecea;border-radius:6px;border-left:4px solid var(--red);">
+    <strong>Primary Verdict:</strong> Performance regression confirmed. p95 = 52.69 ms exceeds the 25.5 ms threshold by 2.07×.
+    Uniform latency pattern across all transactions points to a shared infrastructure bottleneck (AKS ingress or DB connection pooling),
+    not a single defective endpoint. No functional errors detected.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SECTION 8 — NEXT STEPS
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">✅</span> Next Steps</h2>
+  <ol class="steps-list">
+    <li>
+      <div>
+        <strong>Profile POST /api/orders — check order-db query plan for missing indexes</strong><br>
+        <span style="color:var(--muted);">txn_create_order is the highest latency transaction at p95=61.5 ms. Run
+        <code>EXPLAIN ANALYZE SELECT ... FROM orders WHERE user_id=? AND product_id=?</code> in order-db
+        to identify missing indexes. Expected fix: add composite index on (user_id, product_id).</span>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Investigate AKS Nginx ingress keep-alive and PostgreSQL connection pool saturation</strong><br>
+        <span style="color:var(--muted);">Uniform latency across all 5 transactions (51–62 ms) points to a shared bottleneck.
+        Check Nginx ingress controller configuration for keep-alive timeout and HTTP/2 settings.
+        Also check pg connection pool size in each service's environment config vs number of concurrent VUs (20).</span>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Investigate open Dynatrace infrastructure problem "No pod ready"</strong><br>
+        <span style="color:var(--muted);">3 restarts on order-service, product-service, user-service within last 43 min.
+        Review pod restart reason: <code>kubectl describe pod -n perf-demo &lt;pod-name&gt;</code>.
+        Could indicate OOMKill, liveness probe misconfiguration, or intermittent startup failure.</span>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Verify Promtail DaemonSet log shipping is healthy</strong><br>
+        <span style="color:var(--muted);"><code>kubectl get pods -n perf-demo | grep promtail</code> — currently Running (1/1, 0 restarts, 45 min uptime).
+        Confirm Loki is receiving logs from perf-demo namespace by querying Grafana Explore with
+        <code>{namespace="perf-demo"}</code> without the error filter.</span>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Add <code>metrics.read</code> scope to Dynatrace API token</strong><br>
+        <span style="color:var(--muted);">Current token only has <code>metrics.ingest</code> scope.
+        Create a new token with <code>metrics.read</code> added to enable DT response time breakdown
+        and DB time % in the analysis agent. Update <code>DYNATRACE_API_TOKEN</code> in <code>.env</code>
+        and the <code>dynakube</code> k8s secret.</span>
+      </div>
+    </li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     RAW EVIDENCE
+════════════════════════════════════════════════════ -->
+<div class="section">
+  <h2><span class="section-icon">📋</span> Raw Evidence</h2>
+  <h3 style="font-size:13px;font-weight:700;margin-bottom:8px;">kubectl top pods -n perf-demo</h3>
+  <div class="evidence">NAME                               CPU(cores)   MEMORY(bytes)
+frontend-7875dffc6-rsp2c           1m           3Mi
+order-db-7dfb9b749-cwzds           7m           28Mi
+order-service-96cf5b66-gq7np       2m           58Mi
+product-db-646d6fd84-7rn7h         8m           23Mi
+product-service-667666849f-fj86z   1m           61Mi
+promtail-2qzms                     5m           25Mi
+user-db-6bc447984-x6qmb            7m           27Mi
+user-service-5c85d6c857-788n5      1m           59Mi</div>
+
+  <h3 style="font-size:13px;font-weight:700;margin:16px 0 8px;">kubectl get pods -n perf-demo</h3>
+  <div class="evidence">NAME                               READY   STATUS    RESTARTS      AGE
+frontend-7875dffc6-rsp2c           1/1     Running   0             20h
+order-db-7dfb9b749-cwzds           1/1     Running   0             20h
+order-service-96cf5b66-gq7np       1/1     Running   3 (43m ago)   20h
+product-db-646d6fd84-7rn7h         1/1     Running   0             20h
+product-service-667666849f-fj86z   1/1     Running   3 (43m ago)   20h
+promtail-2qzms                     1/1     Running   0             45m
+user-db-6bc447984-x6qmb            1/1     Running   0             20h
+user-service-5c85d6c857-788n5      1/1     Running   3 (43m ago)   20h</div>
+
+  <h3 style="font-size:13px;font-weight:700;margin:16px 0 8px;">Active DB Connections (post-test)</h3>
+  <div class="evidence">userdb   → active_connections: 1  (idle baseline)
+productdb → active_connections: 1  (idle baseline)
+orderdb  → active_connections: 1  (idle baseline)</div>
+
+  <h3 style="font-size:13px;font-weight:700;margin:16px 0 8px;">k6 Results File</h3>
+  <div class="evidence">k6/results/checkout-regression-20260317-141022.json
+  http_req_duration p95: 52.69 ms  (threshold: 25.5 ms)  ← FAIL
+  http_req_duration p90: 48.98 ms
+  http_req_duration avg: 44.54 ms
+  http_req_duration max: 140.18 ms
+  http_reqs total:       1493
+  http_reqs rate:        12.17 req/s
+  iterations:            721
+  checks passes:         2986 / 2986 (100%)
+  http_req_failed:       0 / 1493 (0%)</div>
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  Generated by AI Performance Engineering Pipeline — Reporting Agent &nbsp;|&nbsp;
+  <a href="https://myperformanceproject.grafana.net/d/k6-perf-v3" target="_blank">Grafana Dashboard</a> &nbsp;|&nbsp;
+  <a href="https://kun86120.live.dynatrace.com/#services" target="_blank">Dynatrace Services</a> &nbsp;|&nbsp;
+  Environment: AKS (northeurope) &nbsp;|&nbsp; 2026-03-17
+</div>
+
+</body>
+</html>

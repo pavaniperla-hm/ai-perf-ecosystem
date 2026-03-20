@@ -148,6 +148,11 @@ kubectl top pods -n perf-demo --no-headers 2>/dev/null
 # CPU%  = (millicores / resource_limit_millicores) * 100
 # Mem%  = (MiB / mem_limit_MiB) * 100
 # Default limits if not set: CPU=500m, Mem=256Mi
+# Save full raw output — used verbatim in the Raw Evidence section
+
+# 1b. Pod status (for Raw Evidence section)
+kubectl get pods -n perf-demo 2>/dev/null
+# Save full raw output — used verbatim in the Raw Evidence section
 
 # 2. Active DB connections (run once per database)
 for db_app in user-db product-db order-db; do
@@ -170,6 +175,12 @@ kubectl top pods -n perf-demo -l 'app in (user-db,product-db,order-db)' --no-hea
 - `p95Data`: start at p95*0.4, ramp to p95, slight variance
 - `tpData`: ramp from 0 to rps, slight variance around mean
 - DB arrays: scale with VU ramp (conns = VUs * 0.6-0.8 per db)
+
+**For per-transaction chart arrays** (required for Avg/p90/p95 and Min/Max charts): parse the k6 results JSON to extract per-transaction avg, p90, p95, min, max. Look for trend metrics named `http_req_duration{scenario="<name>"}` or group transaction names by URL/tag. Build these arrays in the same transaction order for all charts:
+- `txnLabels`: short display names (e.g. `["Login","Products","Detail","Checkout","Order History"]`)
+- `txnAvg`, `txnP90`, `txnP95`: per-transaction avg/p90/p95 in ms
+- `txnMin`, `txnMax`: per-transaction min/max in ms
+If the k6 JSON does not have per-transaction breakdown, use overall `avg_ms`, `p90_ms`, `p95_ms` from the summary for all transactions and note it in the chart title.
 
 ### File naming
 
@@ -209,7 +220,9 @@ Write via the Write tool to the path above.
 
 Write a complete, self-contained HTML file to `k6/results/<scenario-slug>-<timestamp>-full-report.html`.
 
-The HTML must include all six sections below in order. Use the exact structure.
+**The HTML structure is defined entirely by the Full HTML skeleton below — do not follow these section descriptions as a layout guide. The skeleton is authoritative.**
+
+The report contains these sections (described here only for understanding the data requirements — actual HTML must match the skeleton):
 
 **Section 1 — Header banner**
 
@@ -239,28 +252,43 @@ Three sub-blocks:
 
 *Overall KPI grid* (4 columns): Avg Response | p95 Response | Error Rate | Check Pass Rate | Throughput (req/s).
 
-*Charts row* (3 charts side by side using a 3-column CSS grid):
+*Row 1 — 3 charts side by side (`.chart-row-3`):*
 
-Chart A — **VU Load Profile** (line chart, stacked area):
+Chart A — **VU Load Profile** (stacked area line chart):
 - X axis: elapsed time labels. For regression-test: `['0s','20s','65s','85s','120s']`. For baseline: `['0s','2m']`.
-- Y axis: Virtual Users
-- Datasets (one per scenario if regression, or single total if baseline): use the stage
-  definitions from the script to construct synthetic data points.
-- Total VU line always shown.
+- Y axis: Virtual Users (stacked)
+- Datasets: one filled area per scenario (Browse/Cart/Checkout/History), each colour-coded.
+  Use scenario VU counts from script stage definitions (12/5/2/1 at peak for regression).
+- `fill: true`, `tension: 0`, stacked Y axis, pointRadius: 4.
+- Note below: "Stacked by scenario — shows ramp shape over test duration"
 
-Chart B — **Users vs Response Time** (dual-axis line chart):
-- X axis: VU count labels (`['0 VUs', '<baseline> VUs', '<peak> VUs']`)
-- Left Y axis (red line): estimated p95 response time — use `[0, p95*0.65, p95]`
-- Right overlay: dashed yellow threshold line at `threshold_p99_ms * 0.85`
-- Note below chart: "Estimated from aggregate p95 — for real time-series see Grafana Dashboard"
+Chart B — **Users vs Response Time** (line chart with threshold overlay):
+- X axis: VU count labels — `['0 VUs', '<baseline_vus> VUs', '<peak_vus> VUs']`
+- Dataset 1 (red, filled area): p95 response time — `[0, p95*0.65, p95]`
+- Dataset 2 (dashed yellow, no fill): flat threshold line at `p95_threshold_ms`
+- Note below: "Estimated from aggregate p95 — for real time-series see Grafana Dashboard"
 
-Chart C — **Throughput** (doughnut for scenario distribution OR a single big KPI):
-- If multi-scenario (regression/realistic): doughnut chart showing scenario load distribution
-  with labels `['Browse (60%)','Cart (25%)','Checkout (10%)','History (5%)']`
-- If single-scenario (baseline): show throughput as a large KPI card with req/s and total reqs
+Chart C — **Throughput & Distribution** (doughnut chart):
+- If multi-scenario (regression/realistic): doughnut showing scenario load weights:
+  labels `['Browse Products','Add to Cart','Full Checkout','Order History']`, values `[60,25,10,5]`
+- Colours: indigo/sky-blue/green/amber matching scenario allocation panel
+- Legend on right side
+- Note below: "<rps> req/s overall throughput"
+- If single-scenario (baseline): single-segment doughnut or ring KPI showing total req count
 
-*Per-transaction p95 table* — columns: Transaction | p95 (ms) | vs threshold | Status badge.
-Rows: all transactions available in `metrics_summary.per_transaction`.
+*Row 2 — 2 charts side by side (`.chart-row`):*
+
+Chart D — **Avg / p90 / p95 by Transaction** (grouped vertical bar chart):
+- X axis: transaction names (`txnLabels`)
+- Datasets: Avg (indigo/rgba(67,56,202,.7)), p90 (amber/rgba(234,179,8,.7)), p95 (red/rgba(220,38,38,.7))
+- Values from `txnAvg`, `txnP90`, `txnP95` arrays
+- Y axis starts at 0, labelled "ms"
+
+Chart E — **Min / Max by Transaction** (grouped vertical bar chart):
+- X axis: same transaction names (`txnLabels`)
+- Datasets: Min (green/rgba(22,163,74,.7)), Max (red/rgba(220,38,38,.7))
+- Values from `txnMin`, `txnMax` arrays
+- Y axis starts at 0, labelled "ms"
 
 **Section 4 — Log Evidence (Loki)**
 
@@ -299,7 +327,7 @@ Numbered list from `next_steps`. Use `<ol>` with styled list items.
 
 ### Full HTML skeleton
 
-Use this CSS, structure and Chart.js setup. Replace ALL placeholders (marked `<like_this>`) with real values from inputs. Load Chart.js from CDN.
+**MANDATORY: You MUST copy the FULL HTML skeleton below verbatim, replacing ONLY the `<placeholder>` values with real data. Do NOT create your own HTML structure, do NOT use different CSS class names, do NOT reorganise sections. The skeleton is the complete report structure — follow it exactly.**
 
 **Data collection required BEFORE writing the HTML** — collect these during the k6 run:
 
@@ -461,24 +489,31 @@ a:hover{text-decoration:underline}
 
   <!-- LOAD PROFILE CHARTS -->
   <div class="section-head"><h2>Load Profile &amp; Response Time</h2><div class="line"></div></div>
-  <div class="chart-row">
+  <div class="chart-row-3">
     <div class="chart-panel">
-      <div class="chart-title"><span>Virtual Users Over Time</span></div>
+      <div class="chart-title"><span>VU Load Profile (120 s)</span></div>
       <div class="chart-wrap"><canvas id="vuChart"></canvas></div>
+      <div style="font-size:.72rem;color:var(--muted);padding:.5rem 0 0">Stacked by scenario — shows ramp shape over test duration</div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title"><span>Response Time (avg / p95) vs Time</span> <span style="color:var(--fail);font-size:.7rem;margin-left:.5rem">— threshold <p95_threshold></span></div>
+      <div class="chart-title"><span>Users vs Response Time</span> <span style="color:var(--fail);font-size:.7rem;margin-left:.5rem">— threshold <p95_threshold>ms</span></div>
       <div class="chart-wrap"><canvas id="rtChart"></canvas></div>
+      <div style="font-size:.72rem;color:var(--muted);padding:.5rem 0 0">Estimated from aggregate p95 at baseline and peak VU levels</div>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title"><span>Throughput &amp; Distribution</span></div>
+      <div class="chart-wrap"><canvas id="tpChart"></canvas></div>
+      <div style="font-size:.72rem;color:var(--muted);padding:.5rem 0 0"><rps> req/s overall throughput</div>
     </div>
   </div>
   <div class="chart-row">
     <div class="chart-panel">
-      <div class="chart-title"><span>Throughput (req/s) Over Time</span></div>
-      <div class="chart-wrap"><canvas id="tpChart"></canvas></div>
+      <div class="chart-title"><span>Avg / p90 / p95</span> — by Transaction</div>
+      <div class="chart-wrap"><canvas id="txnChart"></canvas></div>
     </div>
     <div class="chart-panel">
-      <div class="chart-title"><span>p95 by Transaction</span> <span style="color:var(--fail);font-size:.7rem;margin-left:.5rem">— threshold per txn</span></div>
-      <div class="chart-wrap"><canvas id="txnChart"></canvas></div>
+      <div class="chart-title"><span>Min / Max</span> — by Transaction</div>
+      <div class="chart-wrap"><canvas id="txnMinMaxChart"></canvas></div>
     </div>
   </div>
 
@@ -601,6 +636,31 @@ a:hover{text-decoration:underline}
     </div>
   </div>
 
+  <!-- DYNATRACE APPLICATION MONITORING DETAIL TABLE -->
+  <!-- Always include this section. If dynatrace_analysis.skipped=true, show reason row instead of metrics -->
+  <div style="margin-top:1.5rem;margin-bottom:2.5rem;">
+    <div class="section-head"><h2>Dynatrace Application Monitoring</h2><div class="line"></div></div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Property</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Tenant</td><td><a href="<DYNATRACE_URL>/#services" target="_blank"><DYNATRACE_TENANT_ID>.live.dynatrace.com ↗</a></td></tr>
+        <tr><td>Mode</td><td>applicationMonitoring (init container, CSI-less)</td></tr>
+        <tr><td>Monitored services</td><td><comma-separated list from dynatrace_analysis — e.g. "User Service, Order Service, product-service, productdb, _:80"></td></tr>
+        <tr><td>Problems in test window</td><td><span class="badge <badge-pass if 0|badge-fail if >0>"><dt_window_problems_count></span></td></tr>
+        <tr><td>Open problems (outside window)</td><td><span class="badge <badge-pass if 0|badge-fail if >0>"><dt_open_problems_summary — e.g. "0" or "1 — title (IMPACT_LEVEL)"></span></td></tr>
+        <!-- If dynatrace_analysis.skipped = false AND metrics.read available -->
+        <!-- <tr><td>Slowest service</td><td><slowest_service> — <slowest_service_ms> ms</td></tr> -->
+        <!-- <tr><td>DB time %</td><td><db_pct>%</td></tr> -->
+        <!-- If metrics.read scope missing (dt_slowest_ms=null): -->
+        <tr><td>Response-time breakdown</td><td style="color:var(--muted)">N/A — token missing <code>metrics.read</code> scope</td></tr>
+        <!-- If dynatrace_analysis.skipped = true: -->
+        <!-- <tr><td>Status</td><td style="color:var(--muted)"><dynatrace_analysis.reason></td></tr> -->
+      </tbody>
+    </table>
+  </div>
+
   <!-- LOG EVIDENCE (only show pre block if errors exist) -->
   <!-- If errors found, add this block: -->
   <!--
@@ -626,27 +686,65 @@ a:hover{text-decoration:underline}
     <li><next_step_item></li>
   </ol>
 
+  <!-- RAW EVIDENCE -->
+  <!-- Always include this section. Paste verbatim command output from the pre-report collection step. -->
+  <div class="section-head"><h2>Raw Evidence</h2><div class="line"></div></div>
+  <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.6rem;margin-top:1.5rem">kubectl top pods -n perf-demo</h3>
+  <pre class="log"><verbatim output of: kubectl top pods -n perf-demo></pre>
+
+  <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.6rem;margin-top:1.25rem">kubectl get pods -n perf-demo</h3>
+  <pre class="log"><verbatim output of: kubectl get pods -n perf-demo></pre>
+
+  <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.6rem;margin-top:1.25rem">Active DB Connections (post-test)</h3>
+  <pre class="log"><for each db: "userdb → active_connections: N" on its own line></pre>
+
+  <h3 style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.6rem;margin-top:1.25rem">k6 Results File</h3>
+  <pre class="log"><results_file path>
+  http_req_duration p95: <p95_ms> ms  (threshold: <p95_threshold> ms)  ← <PASS|FAIL>
+  http_req_duration p90: <p90_ms> ms
+  http_req_duration avg: <avg_ms> ms
+  http_req_duration max: <max_ms> ms
+  http_reqs total:       <total_requests>
+  http_reqs rate:        <rps> req/s
+  iterations:            <iterations>
+  checks passes:         <checks_passed> / <checks_total> (<checks_rate_pct>%)
+  http_req_failed:       <errors> / <total_requests> (<error_rate_pct>%)</pre>
+
 </div>
 
-<div class="footer">Generated by AI Performance Engineering Pipeline &nbsp;·&nbsp; Claude Code &nbsp;·&nbsp; <timestamp></div>
+<div class="footer">Generated by AI Performance Engineering Pipeline &nbsp;·&nbsp; Claude Code &nbsp;·&nbsp; <timestamp> &nbsp;|&nbsp; <a href="<GRAFANA_DASHBOARD_URL>" target="_blank">Grafana Dashboard ↗</a> &nbsp;|&nbsp; <a href="<DYNATRACE_URL>/#services" target="_blank">Dynatrace Services ↗</a> &nbsp;|&nbsp; Environment: <ENVIRONMENT></div>
 
 <script>
 // ── DATA (populate with real values from k6 output) ──────────────────────
-const timeLabels = <timeLabels_array>;   // e.g. ['0s','15s','30s','45s','60s','75s','90s','105s','120s']
-const vuData     = <vuData_array>;       // VU count at each time label
-const avgData    = <avgData_array>;      // avg response time ms at each label
-const p95Data    = <p95Data_array>;      // p95 response time ms at each label
-const tpData     = <tpData_array>;       // throughput req/s at each label
-const p95Threshold = <p95_threshold_value>; // numeric threshold ms
 
-// Per-transaction data
-const txnLabels  = <txn_name_array>;     // transaction names (short)
-const txnP95     = <txn_p95_array>;      // p95 per transaction
-const txnLimits  = <txn_limit_array>;    // threshold per transaction
-const txnColors  = txnP95.map((v,i) => v > txnLimits[i] ? 'rgba(244,63,94,0.6)' : 'rgba(16,185,129,0.6)');
-const txnBorders = txnP95.map((v,i) => v > txnLimits[i] ? '#f43f5e' : '#10b981');
+// VU load profile — stacked by scenario (regression-test stage definitions)
+// For regression-test: ramp 0→baseline over 0-20s, hold 20-65s, ramp to peak 65-85s, hold 85-120s
+const vuLabels   = ['0s','20s','65s','85s','120s'];
+const vuBrowse   = [0, <baseline_vus*0.6>, <baseline_vus*0.6>, <peak_vus*0.6>, <peak_vus*0.6>];   // 60%
+const vuCart     = [0, <baseline_vus*0.25>, <baseline_vus*0.25>, <peak_vus*0.25>, <peak_vus*0.25>]; // 25%
+const vuCheckout = [0, <baseline_vus*0.1>, <baseline_vus*0.1>, <peak_vus*0.1>, <peak_vus*0.1>];   // 10%
+const vuHistory  = [0, <baseline_vus*0.05>, <baseline_vus*0.05>, <peak_vus*0.05>, <peak_vus*0.05>];// 5%
+// For regression-test with baseline=10, peak=20: [0,6,6,12,12], [0,2,2,5,5], [0,1,1,2,2], [0,1,1,1,1]
+
+// Users vs Response Time — 3 data points: [0, baseline, peak]
+const vuVsRtVUs = [0, <baseline_vus>, <peak_vus>];
+const vuVsRtP95 = [0, <Math.round(p95_ms*0.65)>, <p95_ms>];
+const p95Threshold = <p95_threshold_value>;  // numeric ms
+
+// Throughput distribution (scenario doughnut — regression/realistic)
+const scenarioLabels  = ['Browse Products','Add to Cart','Full Checkout','Order History'];
+const scenarioWeights = [60, 25, 10, 5];
+
+// Per-transaction data (parse from k6 JSON — avg/p90/p95/min/max per transaction)
+const txnLabels = <txn_name_array>;    // e.g. ['Login','Products','Detail','Checkout','Order History']
+const txnAvg    = <txn_avg_array>;     // avg ms per transaction
+const txnP90    = <txn_p90_array>;     // p90 ms per transaction
+const txnP95    = <txn_p95_array>;     // p95 ms per transaction
+const txnMin    = <txn_min_array>;     // min ms per transaction
+const txnMax    = <txn_max_array>;     // max ms per transaction
 
 // DB connection samples (arrays of active connection counts, one per time label)
+const timeLabels     = <timeLabels_array>;   // e.g. ['0s','15s','30s',...'120s']
 const dbUserConns    = <db_user_conn_array>;
 const dbProductConns = <db_product_conn_array>;
 const dbOrderConns   = <db_order_conn_array>;
@@ -661,50 +759,110 @@ const cd = {
   plugins:{legend:{labels:{color:'#64748b',font:{size:11},boxWidth:12}}},
   scales:{
     x:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'}},
-    y:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'}}
+    y:{beginAtZero:true,ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'}}
   }
 };
 
-// Chart A — VU ramp
+// Chart A — VU Load Profile: stacked area by scenario
 new Chart(document.getElementById('vuChart'),{
   type:'line',
-  data:{labels:timeLabels,datasets:[{
-    label:'Virtual Users',data:vuData,
-    borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,0.08)',
-    tension:0.4,fill:true,pointRadius:3
-  }]},
-  options:{...cd}
+  data:{
+    labels: vuLabels,
+    datasets:[
+      {label:'Browse (60%)',   data:vuBrowse,   fill:true, backgroundColor:'rgba(67,56,202,.25)',  borderColor:'rgba(67,56,202,.9)',  tension:0,pointRadius:4},
+      {label:'Cart (25%)',     data:vuCart,     fill:true, backgroundColor:'rgba(14,165,233,.25)', borderColor:'rgba(14,165,233,.9)', tension:0,pointRadius:4},
+      {label:'Checkout (10%)',data:vuCheckout, fill:true, backgroundColor:'rgba(22,163,74,.25)',  borderColor:'rgba(22,163,74,.9)',  tension:0,pointRadius:4},
+      {label:'History (5%)',   data:vuHistory,  fill:true, backgroundColor:'rgba(217,119,6,.25)',  borderColor:'rgba(217,119,6,.9)',  tension:0,pointRadius:4},
+    ]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top',labels:{color:'#64748b',font:{size:11},boxWidth:12}}},
+    scales:{
+      x:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'},title:{display:true,text:'Elapsed Time',color:'#64748b',font:{size:10}}},
+      y:{beginAtZero:true,stacked:true,ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'},title:{display:true,text:'Virtual Users',color:'#64748b',font:{size:10}}}
+    }
+  }
 });
 
-// Chart B — Response time over time with threshold line
+// Chart B — Users vs Response Time with threshold overlay
 new Chart(document.getElementById('rtChart'),{
   type:'line',
-  data:{labels:timeLabels,datasets:[
-    {label:'Avg (ms)',data:avgData,borderColor:'#10b981',backgroundColor:'transparent',tension:0.4,pointRadius:3},
-    {label:'p95 (ms)',data:p95Data,borderColor:'#f43f5e',backgroundColor:'rgba(244,63,94,0.05)',tension:0.4,fill:true,pointRadius:3,borderDash:[4,3]},
-    {label:'Threshold',data:Array(timeLabels.length).fill(p95Threshold),borderColor:'#f59e0b',backgroundColor:'transparent',borderDash:[6,4],pointRadius:0}
-  ]},
-  options:{...cd}
+  data:{
+    labels: vuVsRtVUs.map(v => v + ' VUs'),
+    datasets:[
+      {label:'p95 Response Time (ms)', data:vuVsRtP95,
+       borderColor:'rgba(220,38,38,.9)', backgroundColor:'rgba(220,38,38,.15)',
+       fill:true, tension:0.3, pointRadius:5, yAxisID:'yRt'},
+      {label:'Threshold ('+p95Threshold+' ms)', data:[p95Threshold,p95Threshold,p95Threshold],
+       borderColor:'rgba(234,179,8,.8)', borderDash:[6,3], pointRadius:0,
+       backgroundColor:'transparent', yAxisID:'yRt'},
+    ]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'top',labels:{color:'#64748b',font:{size:11},boxWidth:12}}},
+    scales:{
+      yRt:{beginAtZero:true,position:'left',ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'},title:{display:true,text:'ms',color:'#64748b',font:{size:10}}},
+      x:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'},title:{display:true,text:'Active Virtual Users',color:'#64748b',font:{size:10}}}
+    }
+  }
 });
 
-// Chart C — Throughput bar
+// Chart C — Throughput Distribution: doughnut by scenario
 new Chart(document.getElementById('tpChart'),{
-  type:'bar',
-  data:{labels:timeLabels,datasets:[{
-    label:'req/s',data:tpData,
-    backgroundColor:'rgba(59,130,246,0.5)',borderColor:'#3b82f6',borderWidth:1,borderRadius:3
-  }]},
-  options:{...cd}
+  type:'doughnut',
+  data:{
+    labels: scenarioLabels,
+    datasets:[{
+      data: scenarioWeights,
+      backgroundColor:['rgba(67,56,202,.8)','rgba(14,165,233,.8)','rgba(22,163,74,.8)','rgba(217,119,6,.8)'],
+      borderWidth:2, borderColor:'#111827'
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{position:'right',labels:{color:'#64748b',font:{size:11},boxWidth:12}},
+      tooltip:{callbacks:{label:ctx => ctx.label+': '+ctx.parsed+'% of load'}}
+    }
+  }
 });
 
-// Chart D — Transaction p95 horizontal bar
+// Chart D — Avg / p90 / p95 by Transaction (grouped vertical bars)
+const sharedBarOpts = {
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{position:'top',labels:{color:'#64748b',font:{size:11},boxWidth:12}}},
+  scales:{
+    x:{ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'}},
+    y:{beginAtZero:true,ticks:{color:'#475569',font:{size:10}},grid:{color:'#1e2d42'},title:{display:true,text:'ms',color:'#64748b',font:{size:10}}}
+  }
+};
+
 new Chart(document.getElementById('txnChart'),{
   type:'bar',
-  data:{labels:txnLabels,datasets:[
-    {label:'p95 (ms)',data:txnP95,backgroundColor:txnColors,borderColor:txnBorders,borderWidth:1,borderRadius:3},
-    {label:'Threshold',data:txnLimits,backgroundColor:'rgba(245,158,11,0.2)',borderColor:'#f59e0b',borderWidth:1,borderRadius:3}
-  ]},
-  options:{...cd,indexAxis:'y'}
+  data:{
+    labels: txnLabels,
+    datasets:[
+      {label:'Avg',   data:txnAvg, backgroundColor:'rgba(67,56,202,.7)'},
+      {label:'p90',   data:txnP90, backgroundColor:'rgba(234,179,8,.7)'},
+      {label:'p95',   data:txnP95, backgroundColor:'rgba(220,38,38,.7)'},
+    ]
+  },
+  options: sharedBarOpts
+});
+
+// Chart E — Min / Max by Transaction (grouped vertical bars)
+new Chart(document.getElementById('txnMinMaxChart'),{
+  type:'bar',
+  data:{
+    labels: txnLabels,
+    datasets:[
+      {label:'Min', data:txnMin, backgroundColor:'rgba(22,163,74,.7)'},
+      {label:'Max', data:txnMax, backgroundColor:'rgba(220,38,38,.7)'},
+    ]
+  },
+  options: sharedBarOpts
 });
 
 // DB charts helper (dual-axis: connections left, CPU% right)

@@ -63,7 +63,7 @@
     <div class="badge-header">REGRESSION — 4 SCENARIOS · 2 MIN · TIGHT THRESHOLDS</div>
     <h1>Regression Test — Performance Report</h1>
     <p>Baseline: 10 VUs &nbsp;·&nbsp; Peak: 20 VUs &nbsp;·&nbsp; Duration: 2 min &nbsp;·&nbsp;
-       Threshold: p(95) &lt; 30 ms &nbsp;·&nbsp; Generated Wed, 11 Mar 2026 15:42:56 GMT</p>
+       Threshold: p(95) &lt; 30 ms &nbsp;·&nbsp; Generated Thu, 19 Mar 2026 09:51:49 GMT</p>
   </div>
   <div class="content">
 
@@ -104,23 +104,23 @@
       <div class="kpi-grid">
         <div class="kpi">
           <div class="kpi-label">Total Requests</div>
-          <div class="kpi-value">1486</div>
-          <div class="kpi-sub">12.06 req/s</div>
+          <div class="kpi-value">1471</div>
+          <div class="kpi-sub">12.07 req/s</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Avg Response Time</div>
-          <div class="kpi-value">51 ms</div>
-          <div class="kpi-sub">p(90) = 68 ms</div>
+          <div class="kpi-value">55 ms</div>
+          <div class="kpi-sub">p(90) = 63 ms</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">p(95) Response</div>
-          <div class="kpi-value">86 ms</div>
+          <div class="kpi-value">69 ms</div>
           <div class="kpi-sub">threshold &lt; 30 ms</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Check Pass Rate</div>
           <div class="kpi-value">100.00%</div>
-          <div class="kpi-sub">2972 passed / 0 failed</div>
+          <div class="kpi-sub">2942 passed / 0 failed</div>
         </div>
         <div class="kpi">
           <div class="kpi-label">Peak Load</div>
@@ -145,7 +145,7 @@
       <div class="card">
         <div class="card-title">Throughput &amp; Distribution</div>
         <div class="chart-wrap"><canvas id="chartScenarios"></canvas></div>
-        <div class="note">12.06 req/s overall throughput</div>
+        <div class="note">12.07 req/s overall throughput</div>
       </div>
     </div>
 
@@ -176,32 +176,32 @@
         <tbody>
     <tr>
       <td class="txn-name">Products List</td>
-      <td>54 ms</td><td>36 ms</td><td>353 ms</td>
-      <td>44 ms</td><td>79 ms</td><td>99 ms</td>
+      <td>58 ms</td><td>42 ms</td><td>192 ms</td>
+      <td>54 ms</td><td>66 ms</td><td>89 ms</td>
       <td class="center"><span class="badge fail">FAILED</span></td>
     </tr>
     <tr>
       <td class="txn-name">Product Detail</td>
-      <td>49 ms</td><td>24 ms</td><td>262 ms</td>
-      <td>42 ms</td><td>64 ms</td><td>85 ms</td>
+      <td>53 ms</td><td>31 ms</td><td>166 ms</td>
+      <td>50 ms</td><td>62 ms</td><td>68 ms</td>
       <td class="center"><span class="badge fail">FAILED</span></td>
     </tr>
     <tr>
       <td class="txn-name">User Login</td>
-      <td>52 ms</td><td>36 ms</td><td>353 ms</td>
-      <td>44 ms</td><td>70 ms</td><td>85 ms</td>
+      <td>56 ms</td><td>38 ms</td><td>107 ms</td>
+      <td>54 ms</td><td>63 ms</td><td>69 ms</td>
       <td class="center"><span class="badge fail">FAILED</span></td>
     </tr>
     <tr>
       <td class="txn-name">Place Order</td>
-      <td>57 ms</td><td>41 ms</td><td>174 ms</td>
-      <td>51 ms</td><td>74 ms</td><td>83 ms</td>
+      <td>61 ms</td><td>50 ms</td><td>155 ms</td>
+      <td>57 ms</td><td>71 ms</td><td>83 ms</td>
       <td class="center"><span class="badge fail">FAILED</span></td>
     </tr>
     <tr>
       <td class="txn-name">Order History</td>
-      <td>57 ms</td><td>37 ms</td><td>206 ms</td>
-      <td>46 ms</td><td>75 ms</td><td>175 ms</td>
+      <td>55 ms</td><td>46 ms</td><td>104 ms</td>
+      <td>53 ms</td><td>63 ms</td><td>70 ms</td>
       <td class="center"><span class="badge fail">FAILED</span></td>
     </tr></tbody>
       </table>
@@ -299,7 +299,7 @@
 
     // Users vs Response Time
     const vuVsRtVUs = [0,10,20];
-    const vuVsRtP95 = [0,56,86];
+    const vuVsRtP95 = [0,45,69];
 
     new Chart(document.getElementById('chartUsersVsRt'), {
       type: 'line',
@@ -358,11 +358,11 @@
 
     // Per-transaction percentiles
     const txnLabels = ["Products List","Product Detail","User Login","Place Order","Order History"];
-    const avgData   = [54,49,52,57,57];
-    const p90Data   = [79,64,70,74,75];
-    const p95Data   = [99,85,85,83,175];
-    const minData   = [36,24,36,41,37];
-    const maxData   = [353,262,353,174,206];
+    const avgData   = [58,53,56,61,55];
+    const p90Data   = [66,62,63,71,63];
+    const p95Data   = [89,68,69,83,70];
+    const minData   = [42,31,38,50,46];
+    const maxData   = [192,166,107,155,104];
 
 
     const sharedOpts = {

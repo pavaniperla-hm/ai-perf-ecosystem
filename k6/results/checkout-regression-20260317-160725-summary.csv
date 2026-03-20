@@ -1,0 +1,2 @@
+date,environment,scenario,verdict,avg_ms,p90_ms,p95_ms,max_ms,error_rate_pct,checks_rate_pct,total_requests,rps,iterations,txn_login_p95,txn_products_p95,txn_detail_p95,txn_create_order_p95,txn_order_history_p95,loki_errors,loki_warnings,dt_skipped,dt_problems,ticket_url,html_report,results_json
+2026-03-17,aks,checkout regression,FAIL,45.97,50.94,54.89,99.84,0.00,100.00,1493,12.16,721,56.00,57.25,56.00,63.00,64.60,0,0,false,1 (No pod ready - infra),TBD,k6/results/checkout-regression-20260317-160725-full-report.html,k6/results/checkout-regression-20260317-160725.json

@@ -1,0 +1,416 @@
+{
+    "metrics": {
+        "http_req_duration": {
+            "avg": 45.96544159410581,
+            "min": 27.8236,
+            "med": 44.7641,
+            "max": 99.8398,
+            "p(90)": 50.94048,
+            "p(95)": 54.892979999999994,
+            "thresholds": {
+                "p(95)<30": true
+            }
+        },
+        "checks": {
+            "passes": 2986,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_connecting": {
+            "min": 0,
+            "med": 0,
+            "max": 52.7067,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.49874862692565314
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 1493,
+            "value": 0
+        },
+        "vus_max": {
+            "value": 20,
+            "min": 20,
+            "max": 20
+        },
+        "iterations": {
+            "count": 721,
+            "rate": 5.872458469104241
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "group_duration": {
+            "avg": 46.814796584058925,
+            "min": 28.0003,
+            "med": 45.0893,
+            "max": 102.1998,
+            "p(90)": 52.0672,
+            "p(95)": 57.155539999999974
+        },
+        "errors_cart": {
+            "passes": 0,
+            "fails": 334,
+            "thresholds": {
+                "rate<0.02": false
+            },
+            "value": 0
+        },
+        "txn_create_order": {
+            "avg": 51.588235294117645,
+            "min": 44,
+            "med": 50,
+            "max": 72,
+            "p(90)": 61,
+            "p(95)": 63,
+            "thresholds": {
+                "p(95)<60": true
+            }
+        },
+        "http_req_sending": {
+            "min": 0,
+            "med": 0,
+            "max": 15.5526,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.03823851306095111
+        },
+        "http_req_receiving": {
+            "avg": 1.866431547220362,
+            "min": 0,
+            "med": 0.4682,
+            "max": 15.7192,
+            "p(90)": 7.184939999999998,
+            "p(95)": 9.4565
+        },
+        "errors_browse": {
+            "passes": 0,
+            "fails": 890,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "txn_product_detail": {
+            "avg": 45.41339869281046,
+            "min": 28,
+            "med": 44,
+            "max": 85,
+            "p(90)": 50.89999999999998,
+            "p(95)": 56,
+            "thresholds": {
+                "p(95)<30": true
+            }
+        },
+        "http_reqs": {
+            "rate": 12.160305817437768,
+            "count": 1493
+        },
+        "data_received": {
+            "count": 3263693,
+            "rate": 26582.38779251904
+        },
+        "iteration_duration": {
+            "p(90)": 2126.17,
+            "p(95)": 3139.6066,
+            "avg": 2169.0795786407743,
+            "min": 2069.9193,
+            "med": 2092.4365,
+            "max": 3213.3302
+        },
+        "txn_user_login": {
+            "avg": 47.416666666666664,
+            "min": 32,
+            "med": 46,
+            "max": 102,
+            "p(90)": 53,
+            "p(95)": 56,
+            "thresholds": {
+                "p(95)<30": true
+            }
+        },
+        "errors_history": {
+            "passes": 0,
+            "fails": 116,
+            "thresholds": {
+                "rate<0.02": false
+            },
+            "value": 0
+        },
+        "http_req_waiting": {
+            "p(95)": 54.07441999999998,
+            "avg": 44.060771533824465,
+            "min": 27.2809,
+            "med": 43.6405,
+            "max": 99.3344,
+            "p(90)": 49.728159999999995
+        },
+        "http_req_blocked": {
+            "med": 0,
+            "max": 52.7067,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.5209364367046216,
+            "min": 0
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 45.96544159410581,
+            "min": 27.8236,
+            "med": 44.7641,
+            "max": 99.8398,
+            "p(90)": 50.94048,
+            "p(95)": 54.892979999999994
+        },
+        "data_sent": {
+            "rate": 1180.8854246089852,
+            "count": 144985
+        },
+        "txn_products_list": {
+            "p(90)": 52,
+            "p(95)": 57.25,
+            "avg": 47.42338709677419,
+            "min": 40,
+            "med": 46,
+            "max": 101,
+            "thresholds": {
+                "p(95)<30": true
+            }
+        },
+        "vus": {
+            "value": 2,
+            "min": 2,
+            "max": 20
+        },
+        "errors_checkout": {
+            "fails": 153,
+            "passes": 0,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "txn_order_history": {
+            "max": 80,
+            "p(90)": 51.300000000000004,
+            "p(95)": 64.6,
+            "avg": 46.672413793103445,
+            "min": 28,
+            "med": 45,
+            "thresholds": {
+                "p(95)<30": true
+            }
+        }
+    },
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "Browse — Products List": {
+                "checks": {
+                    "Browse | Products List | 200": {
+                        "id": "88f39e7f40dfcb354a7a670e2cc917a3",
+                        "passes": 445,
+                        "fails": 0,
+                        "name": "Browse | Products List | 200",
+                        "path": "::Browse — Products List::Browse | Products List | 200"
+                    },
+                    "Browse | Products List | has items": {
+                        "name": "Browse | Products List | has items",
+                        "path": "::Browse — Products List::Browse | Products List | has items",
+                        "id": "daceaf78429f363e1af860183387f188",
+                        "passes": 445,
+                        "fails": 0
+                    }
+                },
+                "name": "Browse — Products List",
+                "path": "::Browse — Products List",
+                "id": "8ddbea8723a6fcfca5159360343f56ee",
+                "groups": {}
+            },
+            "Cart — Login": {
+                "name": "Cart — Login",
+                "path": "::Cart — Login",
+                "id": "0deb6aa005cabb36c53d8202cd7949b1",
+                "groups": {},
+                "checks": {
+                        "Cart | Login | 200": {
+                            "id": "08df993918eb9749d8559c5cba3b476c",
+                            "passes": 167,
+                            "fails": 0,
+                            "name": "Cart | Login | 200",
+                            "path": "::Cart — Login::Cart | Login | 200"
+                        },
+                        "Cart | Login | user returned": {
+                            "name": "Cart | Login | user returned",
+                            "path": "::Cart — Login::Cart | Login | user returned",
+                            "id": "c411c241e3df5dede8eaa96266af7d1f",
+                            "passes": 167,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Checkout — Login": {
+                "name": "Checkout — Login",
+                "path": "::Checkout — Login",
+                "id": "d0818bea61d7226227cb1a34025f93b1",
+                "groups": {},
+                "checks": {
+                        "Checkout | Login | 200": {
+                            "name": "Checkout | Login | 200",
+                            "path": "::Checkout — Login::Checkout | Login | 200",
+                            "id": "fc848aee6a485c90e4260faeddabed0f",
+                            "passes": 51,
+                            "fails": 0
+                        },
+                        "Checkout | Login | user returned": {
+                            "name": "Checkout | Login | user returned",
+                            "path": "::Checkout — Login::Checkout | Login | user returned",
+                            "id": "99adf13efabe8983d4857fddb218004f",
+                            "passes": 51,
+                            "fails": 0
+                        }
+                    }
+            },
+            "History — Login": {
+                "checks": {
+                    "History | Login | 200": {
+                        "path": "::History — Login::History | Login | 200",
+                        "id": "4b11a05c974f16eac58d9a9f42d507b2",
+                        "passes": 58,
+                        "fails": 0,
+                        "name": "History | Login | 200"
+                    },
+                    "History | Login | user returned": {
+                        "name": "History | Login | user returned",
+                        "path": "::History — Login::History | Login | user returned",
+                        "id": "de6be43cef7e2941cd58af33b9f04f9a",
+                        "passes": 58,
+                        "fails": 0
+                    }
+                },
+                "name": "History — Login",
+                "path": "::History — Login",
+                "id": "30ba5b98257e0cb0c90f0bf75819074a",
+                "groups": {}
+            },
+            "Browse — Product Detail": {
+                "name": "Browse — Product Detail",
+                "path": "::Browse — Product Detail",
+                "id": "9c12a0140e70957b56f87de18781381b",
+                "groups": {},
+                "checks": {
+                        "Browse | Product Detail | 200": {
+                            "passes": 445,
+                            "fails": 0,
+                            "name": "Browse | Product Detail | 200",
+                            "path": "::Browse — Product Detail::Browse | Product Detail | 200",
+                            "id": "970cd19b40db72d5ddc2585afba995a9"
+                        },
+                        "Browse | Product Detail | has price": {
+                            "passes": 445,
+                            "fails": 0,
+                            "name": "Browse | Product Detail | has price",
+                            "path": "::Browse — Product Detail::Browse | Product Detail | has price",
+                            "id": "58e090654b95f974504511d69cec4c32"
+                        }
+                    }
+            },
+            "History — Order List": {
+                "name": "History — Order List",
+                "path": "::History — Order List",
+                "id": "7a1a4eeb280ab0847d93ab6097f2e475",
+                "groups": {},
+                "checks": {
+                        "History | Order List | 200": {
+                            "name": "History | Order List | 200",
+                            "path": "::History — Order List::History | Order List | 200",
+                            "id": "9cd69aa94518e0bf485ebdd86bca664c",
+                            "passes": 58,
+                            "fails": 0
+                        },
+                        "History | Order List | is array": {
+                            "id": "be56530d1e1a9cd11d6fe6814fac2bb4",
+                            "passes": 58,
+                            "fails": 0,
+                            "name": "History | Order List | is array",
+                            "path": "::History — Order List::History | Order List | is array"
+                        }
+                    }
+            },
+            "Checkout — Products List": {
+                "name": "Checkout — Products List",
+                "path": "::Checkout — Products List",
+                "id": "ce826f180d839cab6be33400b58552a3",
+                "groups": {},
+                "checks": {
+                        "Checkout | Products List | 200": {
+                            "fails": 0,
+                            "name": "Checkout | Products List | 200",
+                            "path": "::Checkout — Products List::Checkout | Products List | 200",
+                            "id": "47fb2d689244f5aee237fe3c66ab327f",
+                            "passes": 51
+                        },
+                        "Checkout | Products List | has items": {
+                            "id": "fed48de97e92e88333fea5bb17d550b1",
+                            "passes": 51,
+                            "fails": 0,
+                            "name": "Checkout | Products List | has items",
+                            "path": "::Checkout — Products List::Checkout | Products List | has items"
+                        }
+                    }
+            },
+            "Cart — Product Detail": {
+                "name": "Cart — Product Detail",
+                "path": "::Cart — Product Detail",
+                "id": "6156d730674d67436134b598338f616b",
+                "groups": {},
+                "checks": {
+                        "Cart | Product Detail | 200": {
+                            "name": "Cart | Product Detail | 200",
+                            "path": "::Cart — Product Detail::Cart | Product Detail | 200",
+                            "id": "a0d708f4acacab5697cc198102a2ca63",
+                            "passes": 167,
+                            "fails": 0
+                        },
+                        "Cart | Product Detail | has price": {
+                            "name": "Cart | Product Detail | has price",
+                            "path": "::Cart — Product Detail::Cart | Product Detail | has price",
+                            "id": "be944c1f63fae7c05e8067c772bf51b9",
+                            "passes": 167,
+                            "fails": 0
+                        }
+                    }
+            },
+            "Checkout — Place Order": {
+                "path": "::Checkout — Place Order",
+                "id": "ea97fc985eacf2c8494d4055dd04b744",
+                "groups": {},
+                "checks": {
+                        "Checkout | Place Order | 201": {
+                            "name": "Checkout | Place Order | 201",
+                            "path": "::Checkout — Place Order::Checkout | Place Order | 201",
+                            "id": "d38574cc310f6eb2381eea1de32f3a30",
+                            "passes": 51,
+                            "fails": 0
+                        },
+                        "Checkout | Place Order | order created": {
+                            "name": "Checkout | Place Order | order created",
+                            "path": "::Checkout — Place Order::Checkout | Place Order | order created",
+                            "id": "8d24039bea0631b8403af4ffbb3841ee",
+                            "passes": 51,
+                            "fails": 0
+                        }
+                    },
+                "name": "Checkout — Place Order"
+            }
+        },
+        "checks": {},
+        "name": ""
+    }
+}

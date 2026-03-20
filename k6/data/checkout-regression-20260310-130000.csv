@@ -1,0 +1,51 @@
+customer_id,customer_email,customer_name,customer_joined,order_id,order_date,order_status,product_id,product_name,product_category,quantity,unit_price,total_price
+7878,debramccarthy@example.org,Victor Pollard,2026-03-04,49638,2026-03-06,shipped,1871,Handmade Bronze Chips,Electronics,7,607.69,4253.83
+7637,clarkthomas@example.net,Lauren Johnson,2026-03-04,41526,2026-03-06,cancelled,3053,Electronic Plastic Ball,Sports,7,49.59,347.13
+4021,youngmelissa@example.net,Brenda Gomez,2026-03-04,45766,2026-03-06,processing,1465,Licensed Steel Towels,Clothing,7,820.53,5743.71
+8723,manuel52@example.org,Brittany Hammond,2026-03-04,46082,2026-03-06,shipped,4339,Small Soft Towels,Food & Beverage,1,811.98,811.98
+742,nsmith@example.net,Michael Espinoza,2026-03-04,40744,2026-03-06,cancelled,3697,Handmade Fresh Cheese,Toys,2,405.42,810.84
+1381,amandahayes@example.net,Mark Thomas,2026-03-04,49927,2026-03-06,processing,1603,Bespoke Plastic Car,Electronics,10,650.63,6506.30
+8019,jermainedennis@example.org,Shaun Huffman,2026-03-04,46884,2026-03-06,cancelled,1134,Sleek Granite Towels,Home & Garden,5,981.49,4907.45
+8426,vbullock@example.com,Heidi Reed,2026-03-04,46928,2026-03-06,shipped,4449,Licensed Bronze Shoes,Beauty & Health,10,70.60,706.00
+769,karenhanson@example.org,Alexander Ruiz,2026-03-04,40117,2026-03-06,pending,4784,Small Plastic Shoes,Electronics,4,285.14,1140.56
+5020,emedina@example.net,Susan Scott,2026-03-04,23564,2026-03-06,delivered,3329,Unbranded Cotton Pizza,Food & Beverage,5,22.03,110.15
+1393,caseyelizabeth@example.com,Erika Romero,2026-03-04,39136,2026-03-06,pending,1662,Unbranded Soft Computer,Sports,1,684.75,684.75
+9292,ivangonzales@example.org,Darrell Weaver,2026-03-04,45870,2026-03-06,processing,3265,Recycled Soft Shoes,Sports,4,500.18,2000.72
+7756,mcguirejames@example.org,Christopher Hunter,2026-03-04,47723,2026-03-06,shipped,3404,Small Wooden Gloves,Clothing,9,478.29,4304.61
+39,williamwhite@example.com,Johnny Weber,2026-03-04,24366,2026-03-06,processing,3542,Elegant Fresh Shirt,Home & Garden,4,86.05,344.20
+8071,davidgomez@example.net,Bruce Oliver,2026-03-04,42979,2026-03-06,pending,1702,Incredible Granite Shirt,Sports,9,888.02,7992.18
+5404,jennifer24@example.org,Shawn Singleton,2026-03-04,34894,2026-03-06,delivered,3909,Handcrafted Concrete Keyboard,Sports,9,561.51,5053.59
+6079,powersshannon@example.com,Christopher Harris,2026-03-04,37734,2026-03-06,shipped,3416,Rustic Steel Pants,Sports,8,418.93,3351.44
+4926,courtneysmith@example.net,Emma Garcia,2026-03-04,26138,2026-03-06,pending,3575,Unbranded Fresh Shoes,Toys,3,30.06,90.18
+9647,calvinharrison@example.com,Tammy Stuart,2026-03-04,19138,2026-03-06,processing,1421,Small Soft Bike,Food & Beverage,10,377.39,3773.90
+6458,melvin59@example.net,Barbara Manning,2026-03-04,18763,2026-03-06,shipped,1385,Gorgeous Fresh Soap,Electronics,10,656.05,6560.50
+6954,scottdawn@example.com,William Carter,2026-03-04,32311,2026-03-06,processing,406,Generic Steel Salad,Electronics,5,677.08,3385.40
+7364,katieaguilar@example.org,Tara Austin,2026-03-04,40601,2026-03-06,shipped,283,Gorgeous Plastic Tuna,Toys,4,421.35,1685.40
+7591,cyang@example.org,Cynthia Jackson,2026-03-04,47279,2026-03-06,processing,4500,Incredible Metal Towels,Clothing,1,206.65,206.65
+3699,williamscourtney@example.org,Jennifer Faulkner,2026-03-04,47611,2026-03-06,processing,3614,Ergonomic Fresh Bacon,Home & Garden,10,560.64,5606.40
+6963,qmontgomery@example.com,Cassandra Li,2026-03-04,10609,2026-03-06,shipped,471,Incredible Frozen Keyboard,Home & Garden,6,486.74,2920.44
+2313,zmarquez@example.com,Teresa Sloan,2026-03-04,19945,2026-03-06,processing,1740,Rustic Soft Ball,Beauty & Health,8,323.45,2587.60
+6033,angela84@example.net,Edward Jackson,2026-03-04,42842,2026-03-06,pending,3576,Modern Granite Fish,Food & Beverage,6,763.70,4582.20
+6841,farleybradley@example.net,Alexis Walsh,2026-03-04,42694,2026-03-06,pending,2934,Handmade Granite Tuna,Electronics,6,355.33,2131.98
+9164,stephanieleonard@example.org,Rebecca Cain,2026-03-04,23442,2026-03-06,shipped,1996,Small Concrete Chips,Home & Garden,9,736.15,6625.35
+1980,luischavez@example.org,Emily Neal,2026-03-04,48373,2026-03-06,shipped,2359,Modern Soft Shoes,Beauty & Health,2,682.01,1364.02
+7277,smithmichael@example.com,Sean Jones,2026-03-04,48800,2026-03-06,shipped,3182,Handcrafted Fresh Bacon,Home & Garden,9,387.43,3486.87
+3122,jessica51@example.com,Scott Scott,2026-03-04,47984,2026-03-06,delivered,3034,Handcrafted Fresh Chair,Home & Garden,10,100.17,1001.70
+2150,kcarr@example.com,Connor Allen,2026-03-04,39095,2026-03-06,cancelled,3127,Generic Plastic Fish,Toys,2,509.17,1018.34
+7478,stonemelissa@example.com,Randall Shannon,2026-03-04,39240,2026-03-06,delivered,942,Refined Rubber Gloves,Sports,3,428.02,1284.06
+3852,smithbrenda@example.com,Molly Scott,2026-03-04,49019,2026-03-06,processing,1951,Handmade Concrete Keyboard,Toys,7,978.95,6852.65
+1883,pfox@example.net,Harold Gross,2026-03-04,37391,2026-03-06,shipped,1911,Fantastic Frozen Hat,Books,10,58.55,585.50
+2333,julia05@example.org,Shannon Holland,2026-03-04,46107,2026-03-06,cancelled,2571,Bespoke Concrete Gloves,Toys,7,200.48,1403.36
+8981,bernarddaniel@example.org,Charles Graham,2026-03-04,44856,2026-03-06,cancelled,2156,Bespoke Fresh Chicken,Clothing,9,117.68,1059.12
+4249,jessehernandez@example.com,Vanessa Daniel,2026-03-04,47424,2026-03-06,cancelled,908,Luxurious Fresh Mouse,Clothing,7,292.24,2045.68
+9390,lfinley@example.com,Steven White,2026-03-04,48198,2026-03-06,cancelled,424,Small Rubber Shoes,Toys,6,72.28,433.68
+2765,jessicarobinson@example.org,Rebecca Hardy,2026-03-04,48176,2026-03-06,processing,4538,Oriental Soft Table,Home & Garden,6,59.25,355.50
+1607,teresa16@example.org,Caitlin Martinez,2026-03-04,48629,2026-03-06,processing,454,Tasty Steel Hat,Sports,4,692.34,2769.36
+332,qhernandez@example.org,Benjamin Burnett,2026-03-04,31267,2026-03-06,shipped,3129,Ergonomic Granite Shoes,Food & Beverage,2,20.51,41.02
+8094,kimberlyshaw@example.com,Jose Murphy,2026-03-04,43320,2026-03-06,cancelled,3889,Handmade Cotton Tuna,Electronics,7,337.81,2364.67
+5331,cathy66@example.com,Brent Parks,2026-03-04,16514,2026-03-06,delivered,1842,Recycled Rubber Towels,Clothing,8,444.53,3556.24
+6280,george37@example.net,Taylor Pope,2026-03-04,44589,2026-03-06,pending,1638,Handcrafted Metal Gloves,Food & Beverage,2,80.35,160.70
+4267,mark96@example.com,Christine Wiggins,2026-03-04,28866,2026-03-06,shipped,1200,Gorgeous Plastic Salad,Sports,2,280.84,561.68
+8736,gonzalesbrett@example.com,Jeremy Baldwin,2026-03-04,49662,2026-03-06,pending,3263,Licensed Frozen Tuna,Home & Garden,9,802.69,7224.21
+5544,margaretbailey@example.org,Christopher Martinez,2026-03-04,45666,2026-03-06,delivered,1125,Handmade Plastic Shirt,Clothing,9,924.10,8316.90
+7557,nicholas55@example.org,Alicia Brown,2026-03-04,49770,2026-03-06,cancelled,807,Elegant Plastic Soap,Beauty & Health,8,193.52,1548.16
